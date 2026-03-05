@@ -29,11 +29,6 @@ const FormulaEditor: React.FC<Props> = ({
     direction: 'desc'
   });
 
-  // --- STATI PER AI ASSISTANT ---
-  const [prompt, setPrompt] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
-
   const totalWeight = useMemo(() => {
     return formula.ingredients.reduce((acc, ing) => acc + (Number(ing.weightG) || 0), 0);
   }, [formula.ingredients]);
@@ -99,237 +94,87 @@ const FormulaEditor: React.FC<Props> = ({
     return list;
   }, [formula.ingredients, sortConfig]);
 
-  const askGemini = async (mode: 'accordo' | 'analisi') => {
-    setIsAiLoading(true);
-    const apiKey = "AIzaSyCiHkpImqKhESbyrUGU0Bn1K5fAmOw_HU0"; // Ricordati di proteggere questa chiave in produzione!
-    const availableMaterials = Object.keys(MATERIALS_DB).join(", ");
-
-    const systemInstruction = mode === 'accordo'
-      ? `Sei un Master Perfumer. Crea un accordo usando SOLO i materiali in questo elenco: [${availableMaterials}]. Rispondi ESCLUSIVAMENTE con un array JSON: [{"materialName": "nome", "weightG": valore}]. Il totale deve essere esattamente 10.0g.`
-      : `Analizza questa formula: ${JSON.stringify(formula.ingredients)}. Suggerisci miglioramenti tecnici.`;
-
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemInstruction} \n\n Richiesta: ${prompt}` }] }]
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `Errore ${response.status}`);
-      }
-
-      const data = await response.json();
-      let text = data.candidates[0].content.parts[0].text;
-      text = text.replace(/```json|```/g, "").trim();
-
-      // --- LOGICA DI INIEZIONE E PULIZIA ---
-      if (mode === 'accordo') {
-        const jsonMatch = text.match(/\[.*\]/s);
-        if (jsonMatch) {
-          const newIngredients = JSON.parse(jsonMatch[0]);
-          const ingredientsToAdd = newIngredients.map((item: any) => ({
-            id: Math.random().toString(36).substr(2, 9),
-            materialName: item.materialName,
-            weightG: item.weightG.toString(),
-            dilution: "Pure",
-            ...(MATERIALS_DB[item.materialName] || {})
-          }));
-
-          onUpdate({
-            ...formula,
-            ingredients: [...formula.ingredients, ...ingredientsToAdd]
-          });
-
-          setAiResponse("Accordo aggiunto con successo alla formula! ✨");
-          setPrompt("");
-        }
-      } else {
-        setAiResponse(text);
-      }
-    } catch (error: any) {
-      console.error("Errore AI:", error);
-      setAiResponse(`Errore AI: ${error.message}`);
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
-  // Questa funzione rimane come fallback nel caso il JSON non venga parsato automaticamente al primo colpo
-  const applyAiAccord = () => {
-    try {
-      const jsonMatch = aiResponse.match(/\[.*\]/s);
-      if (!jsonMatch) return;
-      const newIngredients = JSON.parse(jsonMatch[0]);
-
-      const ingredientsToAdd = newIngredients.map((item: any) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        materialName: item.materialName,
-        weightG: item.weightG.toString(),
-        dilution: "Pure",
-        ...(MATERIALS_DB[item.materialName] || {})
-      }));
-
-      onUpdate({
-        ...formula,
-        ingredients: [...formula.ingredients, ...ingredientsToAdd]
-      });
-      setAiResponse("Accordo applicato con successo!");
-      setPrompt("");
-    } catch (e) {
-      alert("Errore nell'inserimento automatico.");
-    }
-  };
-
-  // --- LOGICA MATURAZIONE ---
+ // --- LOGICA MATURAZIONE ---
   const handleArchivia = () => {
     const today = new Date();
     const finishDate = new Date();
     
-    // Diciamo a TypeScript: "Se non c'è, usa 0"
-    const days = formula.maturationDays || 0; 
-    
+    // Convertiamo in numero per sicurezza
+    const days = Number(formula.maturationDays) || 0; 
     finishDate.setDate(today.getDate() + days);
 
-    // Aggiorniamo la formula con la data futura e chiamiamo onSave
     const formulaToSave = {
       ...formula,
       maturationFinishDate: finishDate.toISOString(),
-      status: 'macerazione'
+      status: 'macerazione' as any
     };
     
-    // Passiamo la formula aggiornata alla funzione genitore
+    // CHIAMATA UNICA AL SALVATAGGIO
     onSave(formulaToSave);
     
-    // Ora usiamo la costante 'days' che è sicuramente un numero
+    // MESSAGGIO UNICO DI CONFERMA
     if (days > 0) {
         alert(`Progetto "${formula.name || 'Senza Nome'}" archiviato! Maturazione prevista il: ${finishDate.toLocaleDateString('it-IT')}`);
     } else {
-        alert(`Progetto "${formula.name || 'Senza Nome'}" archiviato! (Nessuna maturazione impostata)`);
+        alert(`Progetto "${formula.name || 'Senza Nome'}" archiviato correttamente.`);
     }
   };
-
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* HEADER EDITOR */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4 bg-slate-900/50 p-6 rounded-[32px] border border-slate-800 items-end">
-        <div className="md:col-span-2">
-          <label className="text-[9px] font-black uppercase text-slate-500 mb-2 block tracking-widest ml-1">Nome Progetto</label>
-          <input 
-            className="w-full bg-slate-950 border-slate-800 rounded-xl py-3 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
-            value={formula.name}
-            onChange={(e) => onUpdate({ ...formula, name: e.target.value.toUpperCase() })}
-          />
-        </div>
-        <div>
-          <label className="text-[9px] font-black uppercase text-slate-500 mb-2 block tracking-widest ml-1">Maturazione (GG)</label>
-          <input 
-            type="number"
-            className="w-full bg-slate-950 border-slate-800 rounded-xl py-3 px-4 text-emerald-400 font-bold text-xs outline-none"
-            value={formula.maturationDays || 0}
-            onChange={(e) => onUpdate({ ...formula, maturationDays: parseInt(e.target.value) || 0 })}
-          />
-        </div>
-        
-        <div className="flex items-end">
-          <button onClick={onOpenSelector} className="w-full bg-blue-600 hover:bg-blue-500 text-white h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
-            <Plus size={16} /> Aggiungi
-          </button>
-        </div>
+<div className="grid grid-cols-1 md:grid-cols-7 gap-4 bg-slate-900/50 p-6 rounded-[32px] border border-slate-800 items-end">
+  
+  {/* Nome Progetto (2 colonne) */}
+  <div className="md:col-span-2">
+    <label className="text-[9px] font-black uppercase text-slate-500 mb-2 block tracking-widest ml-1">Nome Progetto</label>
+    <input 
+      className="w-full bg-slate-950 border-slate-800 rounded-xl py-3 px-4 text-white font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+      value={formula.name}
+      onChange={(e) => onUpdate({ ...formula, name: e.target.value.toUpperCase() })}
+    />
+  </div>
 
-        <div className="flex items-end text-blue-400">
-          <button onClick={onScale} className="w-full bg-slate-800 hover:bg-slate-700 h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-slate-700">
-            <Scale size={16} /> Scala
-          </button>
-        </div>
+  {/* Maturazione */}
+  <div>
+    <label className="text-[9px] font-black uppercase text-slate-500 mb-2 block tracking-widest ml-1">Maturazione (GG)</label>
+    <input 
+      type="number"
+      className="w-full bg-slate-950 border-slate-800 rounded-xl py-3 px-4 text-emerald-400 font-bold text-xs outline-none"
+      value={formula.maturationDays || 0}
+      onChange={(e) => onUpdate({ ...formula, maturationDays: parseInt(e.target.value) || 0 })}
+    />
+  </div>
+  
+  {/* Pulsanti Azione */}
+  <div className="flex items-end">
+    <button onClick={onOpenSelector} className="w-full bg-blue-600 hover:bg-blue-500 text-white h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20">
+      <Plus size={16} /> Aggiungi
+    </button>
+  </div>
 
-        <div className="flex items-end text-emerald-400">
-          <button onClick={onExport} className="w-full bg-slate-800 hover:bg-slate-700 h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-slate-700">
-            <Download size={16} /> Excel
-          </button>
-        </div>
+  <div className="flex items-end text-blue-400">
+    <button onClick={onScale} className="w-full bg-slate-800 hover:bg-slate-700 h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-slate-700">
+      <Scale size={16} /> Scala
+    </button>
+  </div>
 
-        <div className="flex items-end text-slate-300">
-          <button onClick={handleArchivia} className="w-full bg-slate-800 hover:bg-slate-700 h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-slate-700">
-            <Save size={16} /> Archivia
-          </button>
-        </div>
-      </div>
+  <div className="flex items-end text-emerald-400">
+    <button onClick={onExport} className="w-full bg-slate-800 hover:bg-slate-700 h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-slate-700">
+      <Download size={16} /> Excel
+    </button>
+  </div>
 
-      {/* AI ASSISTANT PANEL */}
-      <div className="bg-slate-900/80 border border-blue-500/30 rounded-[2.5rem] p-8 mb-8 backdrop-blur-xl shadow-2xl shadow-blue-500/5">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-            <h3 className="text-sm font-black text-white uppercase tracking-widest">Gemini Creative Assistant</h3>
-          </div>
-          <span className="text-[9px] font-bold text-slate-500 uppercase bg-slate-800 px-3 py-1 rounded-full tracking-tighter">AI Engine v2.5 Flash</span>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Input Area */}
-          <div className="space-y-4">
-            <div className="relative">
-              <textarea 
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Chiedi un accordo (es: 'Crea un accordo miele realistico') o analizza la formula attuale..."
-                className="w-full h-32 bg-slate-950/50 border border-slate-800 rounded-2xl p-4 text-[11px] text-slate-300 focus:border-blue-500/50 outline-none transition-all resize-none font-medium leading-relaxed"
-              />
-              <div className="absolute bottom-3 right-3 flex gap-2">
-                 <button 
-                  onClick={() => askGemini('accordo')}
-                  disabled={isAiLoading || !prompt}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white text-[9px] font-black uppercase px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-600/20"
-                 >
-                   {isAiLoading ? "Caricamento..." : "Genera Accordo"}
-                 </button>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => askGemini('analisi')}
-                className="flex-1 bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 text-slate-400 text-[9px] font-black uppercase py-3 rounded-xl transition-all"
-              >
-                Analizza Equilibrio
-              </button>
-            </div>
-          </div>
-
-          {/* Output Area */}
-          <div className="bg-slate-950/80 border border-slate-800/50 rounded-2xl p-5 flex flex-col relative group min-h-[180px]">
-            <div className="flex-1">
-              <p className="text-[11px] text-slate-300 font-mono whitespace-pre-wrap leading-relaxed">
-                {aiResponse || "L'assistente è pronto ad analizzare i tuoi materiali per fornirti suggerimenti tecnici o creativi."}
-              </p>
-            </div>
-            
-            <div className="mt-4 pt-4 border-t border-slate-800/50 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full ${isAiLoading ? "bg-blue-500 animate-ping" : "bg-emerald-500/50"}`}></div>
-                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                  {isAiLoading ? "Gemini sta pensando..." : "System Status: Ready"}
-                </span>
-              </div>
-              {aiResponse.includes('[') && !isAiLoading && (
-                <button 
-                  onClick={applyAiAccord}
-                  className="flex items-center gap-2 text-blue-400 text-[10px] font-black uppercase hover:text-blue-300 transition-colors bg-blue-500/10 px-3 py-2 rounded-lg border border-blue-500/20"
-                >
-                  <Plus size={12}/> Applica Formula 🧪
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
+  {/* FIX: Usiamo la freccia () => per passare la formula corretta */}
+  <div className="flex items-end text-slate-300">
+    <button 
+      onClick={handleArchivia}
+      className="w-full bg-slate-800 hover:bg-slate-700 h-[46px] rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 border border-slate-700"
+    >
+      <Save size={16} /> Archivia
+    </button>
+  </div>
+</div>
       {/* TABELLA INGREDIENTI */}
       <div className="bg-slate-900/30 border border-slate-800 rounded-[40px] overflow-hidden shadow-2xl">
         <table className="w-full text-left border-collapse">
