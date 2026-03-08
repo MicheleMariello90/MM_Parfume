@@ -614,7 +614,7 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="text-white font-black tracking-widest animate-pulse">
-        AURA LAB CLOUD LOADING...
+        Meriti ciò che sogni...
       </div>
     </div>
   );
