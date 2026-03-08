@@ -1,17 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { supabase } from './supabaseClient';
 import FormulaEditor from './FormulaEditor';
 import { Formula, Ingredient } from './types';
-import { MATERIALS_DB, FAMILY_COLORS, DILUTION_MAP } from './constants';
+import { FAMILY_COLORS, DILUTION_MAP } from './constants';
 import { Beaker, Book, Search, Activity, AlertTriangle, X, Plus, Database, Trash2, ChevronRight, BookOpen } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import './index.css';
+
 import MaterialModal from './MaterialModal';
 import FormulaArchive from './FormulaArchive';
 import MaterialLibrary from './MaterialLibrary';
 
 type Section = 'editor' | 'library' | 'history' | 'settings';
 
-// Componente Piramide Olfattiva
+// --- COMPONENTI DI SUPPORTO ORIGINALI ---
 const OlfactivePyramid = ({ notes }: { notes: string[] }) => {
   const isTop = notes.includes('Testa');
   const isHeart = notes.includes('Cuore');
@@ -29,49 +31,35 @@ const OlfactivePyramid = ({ notes }: { notes: string[] }) => {
     </div>
   );
 };
-// AGGIUNGI QUESTO SOPRA LA FUNCTION APP()
+
 const DescriptionEditor = ({ initialValue, onSave, isReadOnly }: { initialValue: string, onSave: (val: string) => void, isReadOnly: boolean }) => {
   const [text, setText] = useState(initialValue);
-
-  // Sincronizza il testo quando cambi materiale
-  React.useEffect(() => {
-    setText(initialValue);
-  }, [initialValue]);
+  useEffect(() => { setText(initialValue); }, [initialValue]);
 
   return (
     <textarea
       readOnly={isReadOnly}
       className={`w-full bg-transparent text-lg text-slate-200 leading-snug italic border-none focus:ring-0 resize-none outline-none ${isReadOnly ? 'cursor-default' : 'cursor-text bg-white/5 rounded-lg p-2'}`}
       value={text}
-      onChange={(e) => setText(e.target.value)} // Aggiornamento locale istantaneo
-      onBlur={() => onSave(text)} // Salva nel database globale solo quando esci dal campo
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => onSave(text)}
       placeholder={!isReadOnly ? "Clicca per aggiungere note..." : "Nessuna nota."}
       rows={3}
     />
   );
 };
-const EditableField = ({ label, value, onSave, isReadOnly, type = "text", step = "1", colorClass = "text-slate-300" }: { 
-  label: string, 
-  value: any, 
-  onSave: (val: any) => void, 
-  isReadOnly: boolean,
-  type?: string,
-  step?: string,
-  colorClass?: string
-}) => {
-  const [tempValue, setTempValue] = React.useState(value);
 
-  React.useEffect(() => {
-    setTempValue(value);
-  }, [value]);
+const EditableField = ({ label, value, onSave, isReadOnly, type = "text", step = "1", colorClass = "text-slate-300" }: { 
+  label: string, value: any, onSave: (val: any) => void, isReadOnly: boolean, type?: string, step?: string, colorClass?: string
+}) => {
+  const [tempValue, setTempValue] = useState(value);
+  useEffect(() => { setTempValue(value); }, [value]);
 
   return (
     <div className={`bg-slate-950/50 p-5 rounded-2xl border ${!isReadOnly ? 'border-blue-500/30' : 'border-slate-800'} text-center transition-all`}>
       <p className="text-[7px] text-slate-500 uppercase font-bold mb-1 tracking-widest">{label}</p>
       <input 
-        type={type}
-        step={step}
-        readOnly={isReadOnly}
+        type={type} step={step} readOnly={isReadOnly}
         className={`bg-transparent text-sm font-mono ${colorClass} w-full text-center outline-none border-none p-0 ${isReadOnly ? 'cursor-default' : 'cursor-text focus:text-white'}`}
         value={tempValue}
         onChange={(e) => setTempValue(e.target.value)}
@@ -84,30 +72,21 @@ const EditableField = ({ label, value, onSave, isReadOnly, type = "text", step =
   );
 };
 
- function App() {
-  // --- 1. ZONA STATI (Dichiarati una sola volta) ---
+function App() {
+  // --- 1. ZONA STATI ---
   const [activeSection, setActiveSection] = useState<Section>('editor');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectorSearch, setSelectorSearch] = useState('');
   const [selectedMaterialInfo, setSelectedMaterialInfo] = useState<string | null>(null);
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
   const [selectorView, setSelectorView] = useState<'materials' | 'accords'>('materials');
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [showFamilyGrid, setShowFamilyGrid] = useState(false);
+  const [isLoadingDB, setIsLoadingDB] = useState(true); // Stato di caricamento Cloud
   
-  // Database reattivo e stato per la modifica
-  const [materialsDB, setMaterialsDB] = useState<Record<string, any>>(MATERIALS_DB);
+  // Database Cloud (sostituisce MATERIALS_DB locale)
+  const [materialsDB, setMaterialsDB] = useState<Record<string, any>>({});
   const [isEditingMaterial, setIsEditingMaterial] = useState(false);
-  const [showPersonalNotes, setShowPersonalNotes] = useState(false);
-  const [isDatabaseOpen, setIsDatabaseOpen] = useState(false);
-  const [dbSearchLoading, setDbSearchLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<string[]>([]);
-  const [tempMaterial, setTempMaterial] = useState<any>(null);
-  const [updateTick, setUpdateTick] = useState(0);
-  const [tempName, setTempName] = useState<string>('');
 
-  // Stati Formula e Archivio
   const [formula, setFormula] = useState<Formula>({
     id: 'current-draft',
     name: 'NOME FORMULA',
@@ -116,69 +95,136 @@ const EditableField = ({ label, value, onSave, isReadOnly, type = "text", step =
     tag: 'LAB-01'
   });
 
-  const [history, setHistory] = useState<Formula[]>(() => {
-    const localData = localStorage.getItem('perfume_lab_history');
-    return localData ? JSON.parse(localData) : [];
-  });
-  // --- FUNZIONI DI AGGIORNAMENTO OTTIMIZZATE (Blindate con useCallback) ---
+  const [history, setHistory] = useState<Formula[]>([]);
 
-const handleAddNewMaterial = React.useCallback(() => {
-  const tempName = `NUOVA MATERIA ${Object.keys(materialsDB).length + 1}`;
-  const newMaterial = {
-    CAS: "",
-    Notes: "Inserisci qui una descrizione...",
-    Volatility: "Testa", 
-    BP: 0,
-    VP: "",
-    Impact: 50,
-    MinUsage: 0,
-    AverageUsage: 0,
-    MaxUsage: 0,
-    IFRA: 100,
-    CostPerGram: 0,
-    Maturazione: 0,
-    Families: {},
-    PersonalDiary: ""
+  // --- 2. FETCH DATI DAL CLOUD (SUPABASE) ---
+  const fetchCloudData = useCallback(async () => {
+    setIsLoadingDB(true);
+    try {
+      // Carica Materiali
+      const { data: mats, error: matsError } = await supabase.from('materials').select('*');
+      if (matsError) throw matsError;
+
+      if (mats) {
+        // Tipizziamo l'accumulatore come Record<string, any>
+        const dbObj = mats.reduce((acc: Record<string, any>, m: any) => {
+  acc[m.name] = {
+    ...m,
+    // Mappatura: trasforma i nomi minuscoli del DB in quelli attesi dai componenti
+    IFRA: m.ifra ? parseFloat(m.ifra) : 100,
+    MinUsage: m.min_usage ? parseFloat(m.min_usage) : 0,
+    MaxUsage: m.max_usage ? parseFloat(m.max_usage) : 100,
+    AverageUsage: m.avg_usage ? parseFloat(m.avg_usage) : 0,
+    Impact: m.impact ? parseFloat(m.impact) : 50, // Se hai aggiunto impact al DB
+    Volatility: m.volatility || 'N/A',
+    Families: m.families || {},
+    Notes: m.notes || '',
+    CAS: m.cas || '',
+  };
+  return acc;
+}, {});
+        setMaterialsDB(dbObj);
+      }
+
+      // Carica Archivio Formule
+      const { data: forms, error: formsError } = await supabase.from('formulas').select('*').order('created_at', { ascending: false });
+      if (formsError) throw formsError;
+      
+      if (forms) {
+        setHistory(forms);
+      }
+    } catch (e) {
+      console.error("Errore fetch Cloud:", e);
+    } finally {
+      setIsLoadingDB(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchCloudData(); }, [fetchCloudData]);
+
+  // --- 3. FUNZIONI DI AGGIORNAMENTO MATERIALI (CLOUD) ---
+  const handleAddNewMaterial = useCallback(async () => {
+  const tempName = window.prompt("Nome della nuova materia prima:");
+  if (!tempName) return;
+  const finalName = tempName.toUpperCase().trim();
+
+  // Usa i nomi delle colonne esattamente come sono nel tuo SQL
+  const newMaterial = { 
+    name: finalName, 
+    volatility: "Testa", 
+    ifra: "100",        // Su DB è text
+    min_usage: "0",     // Su DB è text
+    max_usage: "100",   // Su DB è text
+    avg_usage: "0",     // Su DB è text
+    families: {} 
+  };
+  
+  const { error } = await supabase.from('materials').insert([newMaterial]);
+  
+  if (!error) {
+    await fetchCloudData();
+    setSelectedMaterialInfo(finalName);
+    setIsEditingMaterial(true);
+  } else {
+    console.error("Errore Supabase:", error);
+    window.alert("Errore nella creazione: " + error.message);
+  }
+}, [fetchCloudData]);
+
+  const updateMaterialData = useCallback(async (field: string, value: any) => {
+  if (!selectedMaterialInfo || !field) return;
+
+  // 1. Mappa il nome del campo React al nome della colonna Supabase
+  const fieldMap: Record<string, string> = {
+    'IFRA': 'ifra',
+    'MinUsage': 'min_usage',
+    'MaxUsage': 'max_usage',
+    'AverageUsage': 'avg_usage',
+    'Notes': 'notes',
+    'Volatility': 'volatility',
+    'Families': 'families',
+    'PersonalDiary': 'personal_diary',
+    'Impact': 'impact',
+    'CAS': 'cas',
+    'CostPerGram': 'cost_per_gram'
   };
 
+  const dbColumn = fieldMap[field] || field.toLowerCase();
+  
+  // 2. Prepara il valore per il DB (converti in stringa se necessario per le tue colonne 'text')
+  let dbValue = value;
+  if (['ifra', 'min_usage', 'max_usage', 'avg_usage', 'cost_per_gram'].includes(dbColumn)) {
+    dbValue = value?.toString();
+  }
+
+  // 3. Aggiornamento locale (per velocità UI)
   setMaterialsDB(prev => ({
     ...prev,
-    [tempName]: newMaterial
+    [selectedMaterialInfo]: { ...prev[selectedMaterialInfo], [field]: value }
   }));
-  
-  setSelectedMaterialInfo(tempName);
-  setIsEditingMaterial(true);
-}, [materialsDB]); // Si aggiorna solo se cambia il numero di materie
 
-const updateMaterialData = React.useCallback((field: string, value: any) => {
-  if (!selectedMaterialInfo) return;
-  setMaterialsDB(prev => {
-    if (prev[selectedMaterialInfo][field] === value) return prev;
-    return {
-      ...prev,
-      [selectedMaterialInfo]: { ...prev[selectedMaterialInfo], [field]: value }
-    };
-  });
+  // 4. Aggiornamento Cloud
+  const { error } = await supabase
+    .from('materials')
+    .update({ [dbColumn]: dbValue })
+    .eq('name', selectedMaterialInfo);
+
+  if (error) console.error("Errore salvataggio:", error);
 }, [selectedMaterialInfo]);
 
-const updateFamilyValue = React.useCallback((family: string, percent: number) => {
-  if (!selectedMaterialInfo) return;
-  setMaterialsDB(prev => {
-    const material = prev[selectedMaterialInfo];
+  const updateFamilyValue = useCallback((family: string, percent: number) => {
+    if (!selectedMaterialInfo) return;
+    const material = materialsDB[selectedMaterialInfo];
     const newFamilies = { ...(material.Families || {}) };
     if (percent <= 0) delete newFamilies[family];
     else newFamilies[family] = percent;
-    return {
-      ...prev,
-      [selectedMaterialInfo]: { ...material, Families: newFamilies }
-    };
-  });
-}, [selectedMaterialInfo]);
+    
+    updateMaterialData('Families', newFamilies);
+  }, [selectedMaterialInfo, materialsDB, updateMaterialData]);
 
-const toggleVolatility = React.useCallback((note: string) => {
-  if (!selectedMaterialInfo) return;
-  setMaterialsDB(prev => {
-    const material = prev[selectedMaterialInfo];
+  const toggleVolatility = useCallback((note: string) => {
+    if (!selectedMaterialInfo) return;
+    const material = materialsDB[selectedMaterialInfo];
     let currentVol = material.Volatility || "";
     let parts = currentVol === "N/A" ? [] : currentVol.split('/').filter((p: string) => p !== "");
     
@@ -190,28 +236,18 @@ const toggleVolatility = React.useCallback((note: string) => {
     const order = ["Testa", "Cuore", "Fondo"];
     parts.sort((a: string, b: string) => order.indexOf(a) - order.indexOf(b));
     
-    return {
-      ...prev,
-      [selectedMaterialInfo]: { 
-        ...material, 
-        Volatility: parts.length > 0 ? parts.join('/') : "N/A" 
-      }
-    };
-  });
-}, [selectedMaterialInfo]);
-// --- FUNZIONE PER ELIMINARE MATERIALI (Ripristinata) ---
-const handleDeleteMaterial = React.useCallback((name: string, e: React.MouseEvent) => {
-  e.stopPropagation(); // Fondamentale: evita che si apra il modale mentre clicchi il cestino
-  if (window.confirm(`Eliminare definitivamente ${name}?`)) {
-    setMaterialsDB((prev: any) => {
-      const newDb = { ...prev };
-      delete newDb[name];
-      return newDb;
-    });
-  }
-}, []);
+    updateMaterialData('Volatility', parts.length > 0 ? parts.join('/') : "N/A");
+  }, [selectedMaterialInfo, materialsDB, updateMaterialData]);
 
-  // --- 3. LOGICA FORMULA, EXCEL E SCALATURA ---
+  const handleDeleteMaterial = useCallback(async (name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Eliminare definitivamente ${name}?`)) {
+      await supabase.from('materials').delete().eq('name', name);
+      fetchCloudData();
+    }
+  }, [fetchCloudData]);
+
+  // --- 4. LOGICA FORMULA, EXCEL E SCALATURA (INVARIATA) ---
   
   const scaleFormula = () => {
     const totalAmount = formula.ingredients.reduce((sum, ing) => sum + (Number(ing.weightG) || 0), 0);
@@ -245,7 +281,7 @@ const handleDeleteMaterial = React.useCallback((name: string, e: React.MouseEven
     link.click();
   };
 
-  // --- 4. LOGICA ACCORDI ---
+  // --- 5. LOGICA ACCORDI ---
   
   const addAccordToFormula = (selectedAccord: Formula, targetWeight: number, explode: boolean) => {
     const originalTotalWeight = selectedAccord.ingredients.reduce((sum, ing) => sum + (Number(ing.weightG) || 0), 0);
@@ -275,60 +311,49 @@ const handleDeleteMaterial = React.useCallback((name: string, e: React.MouseEven
     setIsSelecting(false);
   };
 
-  // --- 5. LOGICA ARCHIVIO E CATEGORIE (Ottimizzata) ---
+  // --- 6. LOGICA ARCHIVIO (CLOUD) ---
 
-const archiveFormula = React.useCallback(() => {
-  if (formula.ingredients.length === 0) return window.alert("La formula è vuota!");
-  
-  const name = window.prompt("Nome creazione:", formula.name);
-  const category = window.prompt("In quale cartella vuoi salvarla? (es. MARINI, INVERNALI)", "GENERALE");
-  
-  if (!name || !category) return;
+  const archiveFormula = React.useCallback(async () => {
+    if (formula.ingredients.length === 0) return window.alert("La formula è vuota!");
+    
+    const name = window.prompt("Nome creazione:", formula.name);
+    const category = window.prompt("In quale cartella vuoi salvarla? (es. MARINI, INVERNALI)", "GENERALE");
+    
+    if (!name || !category) return;
 
-  const newEntry = { 
-    ...formula, 
-    id: 'formula-' + Date.now(), 
-    name: name.toUpperCase(), 
-    tag: category.toUpperCase().trim(), 
-    date: new Date().toLocaleDateString() 
-  };
+    // Salva nel database Cloud
+    const { error } = await supabase.from('formulas').insert([{
+      name: name.toUpperCase(),
+      ingredients: formula.ingredients,
+      tag: category.toUpperCase().trim(),
+      date: new Date().toLocaleDateString()
+    }]);
 
-  setHistory(prev => {
-    const updated = [newEntry, ...prev];
-    localStorage.setItem('perfume_lab_history', JSON.stringify(updated));
-    return updated;
-  });
+    if (!error) {
+      window.alert("Formula archiviata in Cloud correttamente!");
+      fetchCloudData(); // Ricarica lo storico
+      setFormula({ id: 'current-draft', name: 'NUOVA CREAZIONE', ingredients: [], date: new Date().toLocaleDateString(), tag: 'LAB-01' });
+    } else {
+      window.alert("Errore salvataggio Formula.");
+    }
+  }, [formula, fetchCloudData]);
 
-  setFormula({ 
-    id: 'current-draft', 
-    name: 'NUOVA CREAZIONE', 
-    ingredients: [], 
-    date: new Date().toLocaleDateString(), 
-    tag: 'LAB-01' 
-  });
+  const loadFromHistory = React.useCallback((savedFormula: any) => {
+    if (window.confirm(`Caricare "${savedFormula.name}"? Le modifiche non salvate alla formula corrente andranno perse.`)) {
+      setFormula(savedFormula);
+      setActiveSection('editor');
+    }
+  }, []);
 
-  window.alert("Formula archiviata correttamente!");
-}, [formula, history]);
+  const deleteFromHistory = React.useCallback(async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm("Eliminare definitivamente questa formula dall'archivio Cloud?")) {
+      await supabase.from('formulas').delete().eq('id', id);
+      fetchCloudData();
+    }
+  }, [fetchCloudData]);
 
-const loadFromHistory = React.useCallback((savedFormula: any) => {
-  if (window.confirm(`Caricare "${savedFormula.name}"? Le modifiche non salvate alla formula corrente andranno perse.`)) {
-    setFormula(savedFormula);
-    setActiveSection('editor');
-  }
-}, []);
-
-const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) => {
-  e.stopPropagation();
-  if (window.confirm("Eliminare definitivamente questa formula dall'archivio?")) {
-    setHistory(prev => {
-      const updated = prev.filter(f => f.id !== id);
-      localStorage.setItem('perfume_lab_history', JSON.stringify(updated));
-      return updated;
-    });
-  }
-}, []);
-// --- LOGICA IA GEMINI ---
-  // --- FUNZIONE IA GEMINI (VERSIONE FETCH) ---
+  // --- 7. LOGICA IA GEMINI (USANDO IL DB REATTIVO) ---
   const handleAIQuery = async (queryText: string): Promise<boolean> => {
     if (!queryText || !queryText.trim()) return false;
     
@@ -341,8 +366,7 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
     setIsAiLoading(true);
 
     try {
-      const db = (MATERIALS_DB as any);
-      const availableMaterials = Object.keys(db).join(", ");
+      const availableMaterials = Object.keys(materialsDB).join(", ");
       
       const prompt = `Sei un Master Perfumer. Crea un accordo di profumeria basato su: "${queryText}".
       Usa SOLO questi materiali: [${availableMaterials}].
@@ -352,9 +376,7 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
 
       const data = await response.json();
@@ -366,28 +388,23 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
       if (jsonMatch) {
         const rawIngredients = JSON.parse(jsonMatch[0]);
         const newIngredients = rawIngredients.map((item: any) => {
-          const info = db[item.materialName] || {};
+          const info = materialsDB[item.materialName] || {};
           return {
             id: Math.random().toString(36).substring(2, 9),
             materialName: item.materialName,
             weightG: String(item.weightG),
             dilution: item.dilution || "100%",
-            notes: info.notes || "N/A",
-            olfactiveFamily: info.olfactiveFamily || "Unknown",
-            intensity: info.intensity || 5,
+            notes: info.Notes || "N/A",
             ...info
           };
         });
 
         setFormula((prev: any) => ({
-          ...prev,
-          id: Date.now().toString(),
-          name: queryText.toUpperCase(),
-          ingredients: newIngredients
+          ...prev, id: Date.now().toString(), name: queryText.toUpperCase(), ingredients: newIngredients
         }));
 
         console.log("✅ Formula creata con successo!");
-        return true; // Segnala che ha finito con successo
+        return true;
       }
       return false;
     } catch (err: any) {
@@ -398,7 +415,8 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
       setIsAiLoading(false);
     }
   };
-  // --- LOGICA DI CALCOLO ---
+
+  // --- 8. LOGICA DI CALCOLO (PIRAMIDE E AVVISI IFRA) ---
   const { analysis, alerts } = useMemo(() => {
     const familyTotals: Record<string, number> = {};
     let currentTotalWeight = 0; 
@@ -409,7 +427,7 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
     });
 
     formula.ingredients.forEach(ing => {
-      const mat = MATERIALS_DB[ing.materialName];
+      const mat = materialsDB[ing.materialName];
       if (mat) {
         const weight = Number(ing.weightG) || 0;
         const isSolvent = mat.Type === "Solvente";
@@ -436,22 +454,16 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
     const scores = Object.values(familyTotals);
     const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
     const finalAnalysis = Object.entries(familyTotals)
-      .map(([name, value]) => ({
-        name,
-        percentage: highestScore > 0 ? (value / highestScore) * 100 : 0
-      }))
+      .map(([name, value]) => ({ name, percentage: highestScore > 0 ? (value / highestScore) * 100 : 0 }))
       .sort((a, b) => b.percentage - a.percentage);
 
     return { analysis: finalAnalysis, alerts: ifraAlerts };
-  }, [formula.ingredients]);
+  }, [formula.ingredients, materialsDB]);
 
   const addMaterialToFormula = (materialName: string) => {
-    const newId = Math.random().toString(36).substring(2, 9) + Date.now();
     const newIngredient: Ingredient = {
-      id: newId,
-      materialName,
-      weightG: 0, 
-      dilution: "100%" 
+      id: Math.random().toString(36).substring(2, 9) + Date.now(),
+      materialName, weightG: 0, dilution: "100%" 
     };
     
     setFormula({ ...formula, ingredients: [...formula.ingredients, newIngredient] });
@@ -468,6 +480,16 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
     }, 50);
   };
 
+  // Se i dati del database non sono ancora stati scaricati mostriamo il caricamento
+  if (isLoadingDB) {
+    return (
+      <div className="h-screen bg-[#020617] flex flex-col items-center justify-center text-blue-500 gap-4">
+        <Activity size={48} className="animate-pulse" />
+        <h1 className="text-xl font-black tracking-[0.3em] uppercase">Aura Lab Cloud Loading...</h1>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-[#020617] text-slate-200 overflow-hidden font-sans relative">
       
@@ -482,7 +504,6 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
             </header>
 
             <div className="p-6 border-b border-slate-800">
-              {/* TASTI TAB PER CAMBIARE VISTA */}
               <div className="flex gap-4 mb-5">
                 <button 
                   onClick={() => setSelectorView('materials')}
@@ -498,7 +519,6 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
                 </button>
               </div>
 
-              {/* BARRA DI RICERCA */}
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input 
@@ -511,20 +531,16 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
               </div>
             </div>
 
-            {/* GRIGLIA RISULTATI DINAMICA */}
             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              
               {selectorView === 'materials' ? (
-                // MOSTRO LE MATERIE PRIME
-                Object.entries(MATERIALS_DB)
+                Object.entries(materialsDB)
                   .filter(([name]) => name.toLowerCase().includes(selectorSearch.toLowerCase()))
-                  .map(([name, data]) => (
+                  .map(([name]) => (
                     <button key={name} onClick={() => addMaterialToFormula(name)} className="p-4 bg-slate-800/40 hover:bg-blue-600/10 border border-slate-800 rounded-2xl group text-left">
                       <span className="text-white font-bold uppercase text-xs group-hover:text-blue-400">{name}</span>
                     </button>
                   ))
               ) : (
-                // MOSTRO GLI ACCORDI DALL'ARCHIVIO
                 history
                   .filter((accord) => accord.name.toLowerCase().includes(selectorSearch.toLowerCase()))
                   .map((accord) => (
@@ -541,7 +557,6 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
                     </button>
                   ))
               )}
-
             </div>
           </div>
         </div>
@@ -556,12 +571,11 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
             src="/logo.png" 
             className="w-28 h-28 object-contain mb-4 cursor-pointer hover:scale-105 transition-transform" 
             onClick={() => setActiveSection('editor')}
-            alt="Logo"
+            alt="Logo Aura Lab"
           />
           <div className="w-16 h-0.5 bg-blue-500/30 rounded-full"></div>
         </div>
 
-        {/* NAVIGAZIONE PRINCIPALE */}
         <nav className="w-full px-4 space-y-1 mb-8">
           {[
             { id: 'editor', icon: <Beaker size={16}/>, label: 'Editor' },
@@ -577,7 +591,6 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
               {item.icon} {item.label}
             </button>
           ))}
-          {/* ARCHIVIO (Sotto il database per separare sourcing da storico) */}
           <button 
             onClick={() => setActiveSection('history')}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
@@ -615,142 +628,138 @@ const deleteFromHistory = React.useCallback((id: string, e: React.MouseEvent) =>
           </div>
         </div>
       </aside>
-     {/* MAIN CONTENT */}
-<main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-  
-  {/* AI COMMAND STATION (Sostituisce il vecchio Header) */}
-<div className="max-w-7xl mx-auto mb-10">
-  <div className="relative group">
-    {/* Effetto bagliore soffuso dietro la barra */}
-    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-[2rem] blur-xl opacity-50 group-focus-within:opacity-100 transition duration-1000"></div>
-    
-    <div className="relative flex items-center bg-slate-900/90 border border-slate-800 rounded-[2rem] backdrop-blur-2xl shadow-2xl">
-      <div className="pl-6 text-blue-500">
-        <Activity size={20} className="animate-pulse" />
-      </div>
-      
-      <input 
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        onKeyDown={async (e) => {
-          if (e.key === 'Enter') {
-            // Aspettiamo che l'IA finisca
-            const success = await handleAIQuery(searchTerm);
-            if (success) {
-              setSearchTerm(''); // SVUOTA LA BARRA
-              setActiveSection('editor'); // CAMBIA SEZIONE
-            }
-          }
-        }}
-        className="bg-transparent text-white py-5 px-5 text-sm w-full outline-none font-medium placeholder:text-slate-600" 
-        placeholder="Chiedi a Gemini: 'Crea un accordo marino' o 'Trova materiali ad alto impatto'..." 
-      />
-      
-      <div className="pr-4">
-        <button 
-          type="button"
-          onClick={async () => {
-            const success = await handleAIQuery(searchTerm);
-            if (success) {
-              setSearchTerm(''); // SVUOTA LA BARRA
-              setActiveSection('editor'); // CAMBIA SEZIONE
-            }
-          }}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/20"
-        >
-          Analizza con IA
-        </button>
-      </div>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        
+        {/* AI COMMAND STATION */}
+        <div className="max-w-7xl mx-auto mb-10">
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-[2rem] blur-xl opacity-50 group-focus-within:opacity-100 transition duration-1000"></div>
+            
+            <div className="relative flex items-center bg-slate-900/90 border border-slate-800 rounded-[2rem] backdrop-blur-2xl shadow-2xl">
+              <div className="pl-6 text-blue-500">
+                <Activity size={20} className="animate-pulse" />
+              </div>
+              
+              <input 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter') {
+                    const success = await handleAIQuery(searchTerm);
+                    if (success) {
+                      setSearchTerm(''); 
+                      setActiveSection('editor'); 
+                    }
+                  }
+                }}
+                className="bg-transparent text-white py-5 px-5 text-sm w-full outline-none font-medium placeholder:text-slate-600" 
+                placeholder="Chiedi a Gemini: 'Crea un accordo marino' o 'Trova materiali ad alto impatto'..." 
+              />
+              
+              <div className="pr-4">
+                <button 
+                  type="button"
+                  onClick={async () => {
+                    const success = await handleAIQuery(searchTerm);
+                    if (success) {
+                      setSearchTerm(''); 
+                      setActiveSection('editor'); 
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                >
+                  Analizza con IA
+                </button>
+              </div>
+            </div>
+            {isAiLoading && (
+              <div className="text-blue-500 text-sm animate-pulse mt-2">
+                ✦ Gemini-2.5-flash sta elaborando la tua richiesta...
+              </div>
+            )}
+            
+            <div className="absolute -bottom-6 left-6 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Database Cloud Sincronizzato</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto">
+          {/* 1. SEZIONE EDITOR */}
+          {activeSection === 'editor' && (
+            <FormulaEditor 
+              formula={formula} 
+              onUpdate={setFormula} 
+              ifraAlerts={alerts} 
+              onSave={archiveFormula} 
+              onScale={scaleFormula}
+              onExport={exportToExcel} 
+              onOpenSelector={() => setIsSelecting(true)}
+              onViewMaterial={(name: string) => setSelectedMaterialInfo(name)} 
+            />
+          )}
+
+          {/* 2. SEZIONE LIBRARY */}
+          {activeSection === 'library' && (
+            <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 px-2">
+                <div />
+                <button 
+                  onClick={handleAddNewMaterial}
+                  className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 group active:scale-95"
+                >
+                  <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em]">Aggiungi Materiale</span>
+                </button>
+              </div>
+
+              <MaterialLibrary 
+                materialsDB={materialsDB}
+                searchTerm={searchTerm}
+                onSelectMaterial={(name) => {
+                  setSelectedMaterialInfo(name);
+                  setIsEditingMaterial(false);
+                }}
+                onDeleteMaterial={handleDeleteMaterial}
+                familyColors={FAMILY_COLORS}
+              />
+            </div>
+          )}
+
+          {/* 3. SEZIONE ARCHIVIO RAGGRUPPATO */}
+          {activeSection === 'history' && (
+            <FormulaArchive 
+              history={history}
+              searchTerm={searchTerm}
+              deleteFromHistory={deleteFromHistory}
+              loadFromHistory={loadFromHistory}
+            />
+          )}
+        </div>
+      </main> 
+
+      {/* <---BLOCCO DEL MATERIALMODAL ---> */}
+      {selectedMaterialInfo && materialsDB[selectedMaterialInfo] && (
+        <MaterialModal 
+          materialName={selectedMaterialInfo}
+          data={materialsDB[selectedMaterialInfo]}
+          onClose={() => { setSelectedMaterialInfo(null); setIsEditingMaterial(false); }}
+          onUpdate={updateMaterialData} 
+          isEditing={isEditingMaterial}
+          setIsEditing={setIsEditingMaterial}
+          setMaterialsDB={setMaterialsDB}
+          setSelectedMaterialInfo={setSelectedMaterialInfo}
+          updateFamilyValue={updateFamilyValue} 
+          toggleVolatility={toggleVolatility}   
+          EditableField={EditableField}
+          DescriptionEditor={DescriptionEditor}
+        />
+      )}
     </div>
-    {isAiLoading && (
-  <div className="text-blue-500 text-sm animate-pulse mt-2">
-    ✦ Gemini-2.5-flash sta elaborando la tua richiesta...
-  </div>
-)}
-    
-    {/* Status Badge */}
-    <div className="absolute -bottom-6 left-6 flex items-center gap-2">
-      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Gemini Engine Online</span>
-    </div>
-  </div>
-</div>
-
-<div className="max-w-7xl mx-auto">
-    
-    {/* 1. SEZIONE EDITOR */}
-    {activeSection === 'editor' && (
-      <FormulaEditor 
-        formula={formula} 
-        onUpdate={setFormula} 
-        ifraAlerts={alerts} 
-        onSave={archiveFormula} 
-        onScale={scaleFormula}
-        onExport={exportToExcel} 
-        onOpenSelector={() => setIsSelecting(true)}
-        onViewMaterial={(name: string) => setSelectedMaterialInfo(name)} 
-      />
-    )}
-{activeSection === 'library' && (
-  <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-    
-    {/* HEADER RIMANE QUI (per gestire il tasto Aggiungi nell'app principale) */}
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 px-2">
-      <div />
-      <button 
-        onClick={handleAddNewMaterial}
-        className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 group active:scale-95"
-      >
-        <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
-        <span className="text-[11px] font-black uppercase tracking-[0.2em]">Aggiungi Materiale</span>
-      </button>
-    </div>
-
-    {/* LA LIBRERIA ORA È UN COMPONENTE ESTERNO "MEMOIZZATO" */}
-    <MaterialLibrary 
-      materialsDB={materialsDB}
-      searchTerm={searchTerm}
-      onSelectMaterial={(name) => {
-        setSelectedMaterialInfo(name);
-        setIsEditingMaterial(false);
-      }}
-      onDeleteMaterial={handleDeleteMaterial}
-      familyColors={FAMILY_COLORS}
-    />
-  </div>
-)}
-
-    {/* 3. SEZIONE ARCHIVIO RAGGRUPPATO */}
-    {activeSection === 'history' && (
-  <FormulaArchive 
-    history={history}
-    searchTerm={searchTerm}
-    deleteFromHistory={deleteFromHistory}
-    loadFromHistory={loadFromHistory}
-  />
-)}
-
-  </div> {/* CHIUSURA DEL MAIN CONTENT AREA (max-w-7xl) */}
-</main> {/* CHIUSURA DEL MAIN TAG */}
-{/* <---BLOCCO DEL MATERIALMODAL ---> */}
-{selectedMaterialInfo && materialsDB[selectedMaterialInfo] && (
-  <MaterialModal 
-  materialName={selectedMaterialInfo}
-  data={materialsDB[selectedMaterialInfo]}
-  onClose={() => { setSelectedMaterialInfo(null); setIsEditingMaterial(false); }}
-  onUpdate={updateMaterialData} // <-- Passa la funzione blindata
-  isEditing={isEditingMaterial}
-  setIsEditing={setIsEditingMaterial}
-  setMaterialsDB={setMaterialsDB}
-  setSelectedMaterialInfo={setSelectedMaterialInfo}
-  updateFamilyValue={updateFamilyValue} // <-- Passa la funzione blindata
-  toggleVolatility={toggleVolatility}   // <-- Passa la funzione blindata
-  EditableField={EditableField}
-  DescriptionEditor={DescriptionEditor}
-/>
-)}
-  </div> // Chiude il div principale (max-w-7xl)
-);
+  );
 }
 
 export default App;

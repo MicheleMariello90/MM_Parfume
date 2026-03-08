@@ -66,4 +66,5 @@ const MaterialLibrary = React.memo(({
   );
 });
 
+// Fondamentale per risolvere TS2306 e TS1208
 export default MaterialLibrary;
