@@ -1,4 +1,10 @@
 {
+  "version": 2,
+  "functions": {
+    "api/gemini.mts": {
+      "runtime": "@vercel/node@3.0"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
