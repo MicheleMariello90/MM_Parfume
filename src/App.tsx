@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import FormulaEditor from './FormulaEditor';
 import { Formula, Ingredient } from './types';
 import { FAMILY_COLORS, DILUTION_MAP } from './constants';
-import { Beaker, Book, Search, Activity, AlertTriangle, X, Plus, Database, Trash2, ChevronRight, BookOpen } from 'lucide-react';
+import { Beaker, Book, Search, Activity, AlertTriangle, X, Plus, Database, Trash2, ChevronRight, BookOpen, Menu } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import './index.css';
 
@@ -82,6 +82,7 @@ function App() {
   const [selectorView, setSelectorView] = useState<'materials' | 'accords'>('materials');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true); // Stato di caricamento Cloud
   
   // Database Cloud (sostituisce MATERIALS_DB locale)
@@ -622,9 +623,17 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
   return (
     <div className="flex h-screen bg-[#020617] text-slate-200 overflow-hidden font-sans relative">
       
+      {/* 1. PULSANTE HAMBURGER (Solo Mobile) */}
+      <button 
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        className="md:hidden fixed top-4 left-4 z-[60] bg-blue-600 p-3 rounded-2xl shadow-lg border border-blue-400/30 text-white"
+      >
+        {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
       {/* OVERLAY SELEZIONE MATERIE E ACCORDI */}
       {isSelecting && (
-        <div className="fixed inset-0 z-50 bg-[#020617]/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] bg-[#020617]/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 w-full max-w-4xl max-h-full rounded-[2.5rem] border border-slate-800 shadow-2xl flex flex-col overflow-hidden">
             
             <header className="p-8 border-b border-slate-800 flex justify-between items-center">
@@ -691,15 +700,18 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
         </div>
       )}
 
-      {/* SIDEBAR LATERALE */}
-      <aside className="w-72 border-r border-slate-800 bg-slate-900/50 flex flex-col py-10 shrink-0 overflow-hidden">
+      {/* 2. SIDEBAR LATERALE (Ora con classi responsive per il drawer) */}
+      <aside className={`
+        fixed md:relative z-50 h-full w-72 border-r border-slate-800 bg-slate-900 flex flex-col py-10 shrink-0 overflow-hidden transition-transform duration-300 ease-in-out
+        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         
         {/* LOGO AZIENDALE */}
         <div className="flex flex-col items-center w-full px-6 mb-8">
           <img 
             src="/logo.png" 
             className="w-28 h-28 object-contain mb-4 cursor-pointer hover:scale-105 transition-transform" 
-            onClick={() => setActiveSection('editor')}
+            onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
             alt="Logo Aura Lab"
           />
           <div className="w-16 h-0.5 bg-blue-500/30 rounded-full"></div>
@@ -712,7 +724,7 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
           ].map((item) => (
             <button 
               key={item.id} 
-              onClick={() => setActiveSection(item.id as Section)}
+              onClick={() => { setActiveSection(item.id as Section); setIsMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
                 activeSection === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-800'
               }`}
@@ -721,7 +733,7 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
             </button>
           ))}
           <button 
-            onClick={() => setActiveSection('history')}
+            onClick={() => { setActiveSection('history'); setIsMenuOpen(false); }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
               activeSection === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-800'
             }`}
@@ -758,8 +770,17 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
         </div>
       </aside>
 
+      {/* 3. OVERLAY DI SFONDO MOBILE (Chiude il menu toccando fuori) */}
+      {isMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setIsMenuOpen(false)}
+        />
+      )}
+
       {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+      {/* 4. Aggiunto padding-top per evitare sovrapposizioni con l'hamburger menu su mobile */}
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pt-20 md:pt-8">
         
         {/* AI COMMAND STATION */}
         <div className="max-w-7xl mx-auto mb-10">
@@ -767,7 +788,7 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-[2rem] blur-xl opacity-50 group-focus-within:opacity-100 transition duration-1000"></div>
             
             <div className="relative flex items-center bg-slate-900/90 border border-slate-800 rounded-[2rem] backdrop-blur-2xl shadow-2xl">
-              <div className="pl-6 text-blue-500">
+              <div className="pl-6 text-blue-500 hidden sm:block">
                 <Activity size={20} className="animate-pulse" />
               </div>
               
@@ -783,11 +804,11 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
                     }
                   }
                 }}
-                className="bg-transparent text-white py-5 px-5 text-sm w-full outline-none font-medium placeholder:text-slate-600" 
-                placeholder="Chiedi a Gemini: 'Crea un accordo marino' o 'Trova materiali ad alto impatto'..." 
+                className="bg-transparent text-white py-4 px-4 sm:py-5 sm:px-5 text-xs sm:text-sm w-full outline-none font-medium placeholder:text-slate-600" 
+                placeholder="Chiedi a Gemini..." 
               />
               
-              <div className="pr-4">
+              <div className="pr-2 sm:pr-4">
                 <button 
                   type="button"
                   onClick={async () => {
@@ -797,19 +818,19 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
                       setActiveSection('editor'); 
                     }
                   }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/20"
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/20 whitespace-nowrap"
                 >
-                  Analizza con IA
+                  Analizza
                 </button>
               </div>
             </div>
             {isAiLoading && (
-              <div className="text-blue-500 text-sm animate-pulse mt-2">
-                ✦ Gemini-2.5-flash sta elaborando la tua richiesta...
+              <div className="text-blue-500 text-xs sm:text-sm animate-pulse mt-2 ml-4">
+                ✦ Elaborazione...
               </div>
             )}
             
-            <div className="absolute -bottom-6 left-6 flex items-center gap-2">
+            <div className="absolute -bottom-6 left-6 flex items-center gap-2 hidden sm:flex">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
               <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Database Cloud Sincronizzato</span>
             </div>
@@ -838,7 +859,7 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
                 <div />
                 <button 
                   onClick={handleAddNewMaterial}
-                  className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 group active:scale-95"
+                  className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 group active:scale-95 w-full md:w-auto justify-center"
                 >
                   <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
                   <span className="text-[11px] font-black uppercase tracking-[0.2em]">Aggiungi Materiale</span>
@@ -889,6 +910,6 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
       )}
     </div>
   );
-}
+  } 
 
 export default App;
