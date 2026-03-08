@@ -486,11 +486,13 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
   const handleAIQuery = async (queryText: string): Promise<boolean> => {
     if (!queryText || !queryText.trim()) return false;
     
+    /* // VECCHIA LOGICA DISATTIVATA PER SICUREZZA
     const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!apiKey){
       alert("Manca la API Key nel file .env");
       return false;
     }
+    */
 
     setIsAiLoading(true);
 
@@ -502,11 +504,19 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
       Rispondi esclusivamente con un array JSON puro, senza markdown e senza testo prima o dopo.
       Esempio: [{"materialName": "ISO E SUPER", "weightG": 5.0, "dilution": "100%"}]`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
+      const response = await fetch('/api/gemini', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  // Spediamo il corpo del messaggio al nostro server Vercel
+  // Sarà poi il file /api/gemini.ts a metterci la chiave segreta
+  body: JSON.stringify({
+    contents: [{
+      parts: [{ text: prompt }] // Assicurati che 'prompt' sia la variabile che contiene il tuo testo
+    }]
+  })
+});
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || "Errore API");
