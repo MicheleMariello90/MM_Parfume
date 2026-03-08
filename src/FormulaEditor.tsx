@@ -205,93 +205,104 @@ const FormulaEditor: React.FC<Props> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40">
-            {sortedIngredients.map((ing) => {
-              const mat = MATERIALS_DB[ing.materialName];
-              const isSolvent = mat?.Type === "Solvente";
-              const ratio = isSolvent ? 1 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
-              const pureWeight = (Number(ing.weightG) || 0) * ratio;
-              const absolutePercentage = totalWeight > 0 ? (pureWeight / totalWeight) * 100 : 0;
-              const partialCost = pureWeight * (mat?.CostPerGram || 0);
-              const isOverIfra = mat && absolutePercentage > (mat.IFRA || 100);
+  {sortedIngredients.map((ing) => {
+    const mat = MATERIALS_DB[ing.materialName];
+    const isSolvent = mat?.Type === "Solvente";
+    const ratio = isSolvent ? 1 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
+    const pureWeight = (Number(ing.weightG) || 0) * ratio;
+    const absolutePercentage = totalWeight > 0 ? (pureWeight / totalWeight) * 100 : 0;
+    const isOverIfra = mat && absolutePercentage > (mat.IFRA || 100);
 
-              return (
-                <tr key={ing.id} className="hover:bg-blue-500/[0.02] group transition-colors">
-                  <td className="py-4 px-8">
-                    <button 
-                      type="button"
-                      onClick={() => onViewMaterial(ing.materialName)}
-                      className="text-white font-bold text-sm uppercase tracking-wide hover:text-blue-400 transition-colors text-left"
-                    >
-                      {ing.materialName || <span className="text-slate-700 italic">Senza nome</span>}
-                    </button>
+    return (
+      <tr key={ing.id} className="hover:bg-blue-500/[0.02] group transition-colors">
+        {/* COLONNA NOME + CONTROLLI MOBILE */}
+        <td className="py-4 px-4 md:px-8">
+          <div className="flex flex-col gap-1">
+            <button 
+              type="button"
+              onClick={() => onViewMaterial(ing.materialName)}
+              className="text-white font-bold text-[13px] md:text-sm uppercase tracking-wide hover:text-blue-400 transition-colors text-left truncate max-w-[180px] md:max-w-none"
+            >
+              {ing.materialName || <span className="text-slate-700 italic">Senza nome</span>}
+            </button>
+            
+            {/* CONTROLLI EDITABILI SU MOBILE (Peso e Diluizione) */}
+            <div className="flex md:hidden items-center gap-2 mt-2">
+               {/* Input Peso */}
+               <input 
+                type="number" step="0.001"
+                className="bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-blue-400 font-mono text-[13px] w-20 outline-none focus:border-blue-500"
+                value={ing.weightG}
+                onChange={(e) => updateIngredient(ing.id, 'weightG', e.target.value)}
+              />
+              
+              {/* Selettore Diluizione (Sempre visibile e accessibile) */}
+              <select 
+                disabled={isSolvent}
+                className={`bg-slate-800 border border-slate-700 rounded-lg text-[10px] font-bold py-1.5 px-2 outline-none ${isSolvent ? 'opacity-30' : 'text-white'}`}
+                value={isSolvent ? 'Pure' : ing.dilution}
+                onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
+              >
+                {Object.keys(DILUTION_MAP).map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
 
-                    {/* SEZIONE PARAMETRI */}
-                    {mat && (
-                      <div className="flex gap-4 mt-1.5 items-center opacity-90">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[7px] font-black text-slate-500 uppercase tracking-tighter">IFRA</span>
-                          <span className={`text-sm font-black ${isOverIfra ? "text-red-500 animate-pulse" : "text-slate-400"}`}>
-                            {mat.IFRA || 100}%
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-baseline gap-1 border-l border-slate-800 pl-3">
-                          <span className="text-[7px] font-black text-slate-500 uppercase tracking-tighter">RANGE</span>
-                          <span className={`text-[10px] font-bold ${(absolutePercentage < (mat.MinUsage || 0) || absolutePercentage > (mat.MaxUsage || 100)) 
-                            ? "text-orange-400" 
-                            : "text-slate-500"}`}>
-                            {mat.MinUsage || '0'}-{mat.MaxUsage || mat.IFRA || '10'}%
-                          </span>
-                        </div>
+            {/* IFRA e Famiglia */}
+            {mat && (
+              <div className="flex gap-2 mt-1 items-center">
+                <span className={`text-[10px] font-black ${isOverIfra ? "text-red-500" : "text-slate-500"}`}>
+                  IFRA {mat.IFRA || 100}%
+                </span>
+                <span className="text-[10px] text-slate-700">|</span>
+                <span className="text-[10px] text-slate-500 uppercase">{mat.Family}</span>
+              </div>
+            )}
+          </div>
+        </td>
 
-                        {isSolvent && (
-                          <span className="text-[8px] font-black text-blue-500/60 uppercase tracking-widest ml-1">
-                            [Solvente]
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  
-                  <td className="py-4 px-4 text-center">
-                    <select 
-                      disabled={isSolvent}
-                      className={`bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 outline-none transition-opacity ${isSolvent ? 'opacity-30 cursor-not-allowed' : 'text-slate-400'}`}
-                      value={isSolvent ? 'Pure' : ing.dilution}
-                      onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
-                    >
-                      {Object.keys(DILUTION_MAP).map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                  </td>
+        {/* DILUIZIONE DESKTOP (Nascosta su Mobile) */}
+        <td className="hidden md:table-cell py-4 px-4 text-center">
+          <select 
+            disabled={isSolvent}
+            className={`bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 outline-none ${isSolvent ? 'opacity-30' : 'text-slate-400'}`}
+            value={isSolvent ? 'Pure' : ing.dilution}
+            onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
+          >
+            {Object.keys(DILUTION_MAP).map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </td>
 
-                  <td className="py-4 px-4 text-center">
-                    <input 
-                      type="number" step="0.001"
-                      className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-slate-500 font-mono text-xs w-24 text-center outline-none focus:border-blue-500/50 focus:text-white transition-all"
-                      value={ing.weightG}
-                      onChange={(e) => updateIngredient(ing.id, 'weightG', e.target.value)}
-                    />
-                  </td>
+        {/* PESO LORDO DESKTOP (Nascosto su Mobile) */}
+        <td className="hidden md:table-cell py-4 px-4 text-center">
+          <input 
+            type="number" step="0.001"
+            className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-slate-500 font-mono text-xs w-24 text-center outline-none"
+            value={ing.weightG}
+            onChange={(e) => updateIngredient(ing.id, 'weightG', e.target.value)}
+          />
+        </td>
 
-                  <td className="py-4 px-4 text-center">
-                    <div className={`text-[12px] font-mono font-black ${isOverIfra ? "text-red-500 animate-pulse" : "text-blue-400"}`}>
-                      {absolutePercentage.toFixed(3)}%
-                    </div>
-                  </td>
+        {/* PERCENTUALE ASSOLUTA (Sempre visibile) */}
+        <td className="py-4 px-4 text-center">
+          <div className={`text-[13px] md:text-[12px] font-mono font-black ${isOverIfra ? "text-red-500" : "text-blue-400"}`}>
+            {absolutePercentage.toFixed(2)}%
+          </div>
+        </td>
 
-                  <td className="py-4 px-4 text-center font-mono text-[11px] text-emerald-500/80">
-                    €{partialCost.toFixed(3)}
-                  </td>
+        {/* COSTO (Nascosto su Mobile per recuperare spazio) */}
+        <td className="hidden md:table-cell py-4 px-4 text-center font-mono text-[11px] text-emerald-500/80">
+          €{(pureWeight * (mat?.CostPerGram || 0)).toFixed(3)}
+        </td>
 
-                  <td className="py-4 px-8 text-right">
-                    <button onClick={() => removeIngredient(ing.id)} className="text-slate-700 hover:text-red-500 transition-colors">
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+        <td className="py-4 px-4 md:px-8 text-right">
+          <button onClick={() => removeIngredient(ing.id)} className="text-slate-700 hover:text-red-500 p-2">
+            <Trash2 size={18} />
+          </button>
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
         </table>
 
         {/* FOOTER TOTALI */}
