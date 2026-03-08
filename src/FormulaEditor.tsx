@@ -100,7 +100,7 @@ const FormulaEditor: React.FC<Props> = ({
     const finishDate = new Date();
     
     // Convertiamo in numero per sicurezza
-    const days = Number(formula.maturationDays) || 0; 
+    const days = Number(formula.maturation_days) || 0; 
     finishDate.setDate(today.getDate() + days);
 
     const formulaToSave = {
@@ -139,11 +139,11 @@ const FormulaEditor: React.FC<Props> = ({
   <div>
     <label className="text-[9px] font-black uppercase text-slate-500 mb-2 block tracking-widest ml-1">Maturazione (GG)</label>
     <input 
-      type="number"
-      className="w-full bg-slate-950 border-slate-800 rounded-xl py-3 px-4 text-emerald-400 font-bold text-xs outline-none"
-      value={formula.maturationDays || 0}
-      onChange={(e) => onUpdate({ ...formula, maturationDays: parseInt(e.target.value) || 0 })}
-    />
+  type="number"
+  className="w-full bg-slate-950 border-slate-800 rounded-xl py-3 px-4 text-emerald-400 font-bold text-xs outline-none"
+  value={formula.maturation_days || 0}
+  onChange={(e) => onUpdate({ ...formula, maturation_days: parseInt(e.target.value) || 0 })}
+/>
   </div>
   
   {/* Pulsanti Azione */}

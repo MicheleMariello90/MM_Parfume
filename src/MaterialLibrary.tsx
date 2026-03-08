@@ -18,11 +18,13 @@ const MaterialLibrary = React.memo(({
 }: MaterialLibraryProps) => {
   
   const filtered = React.useMemo(() => {
-    return Object.entries(materialsDB)
-      .filter(([name]) => name.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort(([a], [b]) => a.localeCompare(b));
-  }, [materialsDB, searchTerm]);
-
+  if (!materialsDB) return [];
+  return Object.entries(materialsDB)
+    .filter(([name]) => 
+      name && name.toLowerCase().includes((searchTerm || "").toLowerCase())
+    )
+    .sort(([a], [b]) => a.localeCompare(b));
+}, [materialsDB, searchTerm]);
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {filtered.map(([name, data]: [string, any]) => (
@@ -41,16 +43,17 @@ const MaterialLibrary = React.memo(({
           <div className="flex justify-between items-start mb-4">
             <h4 className="font-black text-xl text-white uppercase truncate pr-8 group-hover:text-blue-400 transition-colors">{name}</h4>
             <span className="text-[8px] px-3 py-1 rounded-full font-black bg-slate-800 text-slate-400 uppercase tracking-widest border border-slate-700">
-              {data.Volatility || 'N/A'}
+              {data.Volatility || data.volatility || 'N/A'}
             </span>
           </div>
           
           <p className="text-[11px] text-slate-500 mb-6 italic line-clamp-2 leading-relaxed">
-            {data.Notes || 'Nessuna descrizione disponibile.'}
+            {data.Notes || data.description || data.notes || 'Nessuna descrizione.'}
           </p>
           
           <div className="flex flex-wrap gap-2">
-            {Object.keys(data.Families || {}).map(f => (
+            {/* Usiamo data.families (minuscolo) come alternativa per Supabase */}
+            {Object.keys(data.Families || data.families || {}).map(f => (
               <span 
                 key={f} 
                 className="text-[7px] px-3 py-1 rounded-full font-black text-white uppercase tracking-tighter" 
@@ -66,5 +69,4 @@ const MaterialLibrary = React.memo(({
   );
 });
 
-// Fondamentale per risolvere TS2306 e TS1208
 export default MaterialLibrary;

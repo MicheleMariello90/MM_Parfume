@@ -81,6 +81,7 @@ function App() {
   const [selectedMaterialInfo, setSelectedMaterialInfo] = useState<string | null>(null);
   const [selectorView, setSelectorView] = useState<'materials' | 'accords'>('materials');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDB, setIsLoadingDB] = useState(true); // Stato di caricamento Cloud
   
   // Database Cloud (sostituisce MATERIALS_DB locale)
@@ -88,57 +89,168 @@ function App() {
   const [isEditingMaterial, setIsEditingMaterial] = useState(false);
 
   const [formula, setFormula] = useState<Formula>({
-    id: 'current-draft',
-    name: 'NOME FORMULA',
-    ingredients: [],
-    date: new Date().toLocaleDateString(),
-    tag: 'LAB-01'
-  });
+  id: 'current-draft',
+  name: 'NOME FORMULA',
+  ingredients: [],
+  date: new Date().toLocaleDateString(),
+  tag: 'GENERALE',
+  description: '',      // Inizializza vuoto
+  maturation_days: 30   // Valore di default
+});
 
   const [history, setHistory] = useState<Formula[]>([]);
 
   // --- 2. FETCH DATI DAL CLOUD (SUPABASE) ---
   const fetchCloudData = useCallback(async () => {
-    setIsLoadingDB(true);
-    try {
-      // Carica Materiali
-      const { data: mats, error: matsError } = await supabase.from('materials').select('*');
-      if (matsError) throw matsError;
+  setIsLoading(true);
+  try {
+    console.log("Inizio fetch materiali...");
+    const { data: mats, error: matsError } = await supabase
+      .from('materials')
+      .select('*');
 
-      if (mats) {
-        // Tipizziamo l'accumulatore come Record<string, any>
-        const dbObj = mats.reduce((acc: Record<string, any>, m: any) => {
-  acc[m.name] = {
-    ...m,
-    // Mappatura: trasforma i nomi minuscoli del DB in quelli attesi dai componenti
-    IFRA: m.ifra ? parseFloat(m.ifra) : 100,
-    MinUsage: m.min_usage ? parseFloat(m.min_usage) : 0,
-    MaxUsage: m.max_usage ? parseFloat(m.max_usage) : 100,
-    AverageUsage: m.avg_usage ? parseFloat(m.avg_usage) : 0,
-    Impact: m.impact ? parseFloat(m.impact) : 50, // Se hai aggiunto impact al DB
-    Volatility: m.volatility || 'N/A',
-    Families: m.families || {},
-    Notes: m.notes || '',
-    CAS: m.cas || '',
-  };
-  return acc;
-}, {});
-        setMaterialsDB(dbObj);
-      }
+    if (matsError) throw matsError;
 
-      // Carica Archivio Formule
-      const { data: forms, error: formsError } = await supabase.from('formulas').select('*').order('created_at', { ascending: false });
-      if (formsError) throw formsError;
+    if (mats) {
+      console.log("Materiali grezzi ricevuti:", mats.length);
       
-      if (forms) {
-        setHistory(forms);
-      }
-    } catch (e) {
-      console.error("Errore fetch Cloud:", e);
-    } finally {
-      setIsLoadingDB(false);
+      const dbObj = mats.reduce((acc: any, m: any) => {
+        // TRADUZIONE FONDAMENTALE: 
+        // Trasformiamo i campi minuscoli di Supabase in quelli attesi dai tuoi componenti
+        acc[m.name] = {
+          ...m,
+          name: m.name,
+          // Se nel DB è 'volatility', l'app vuole 'Volatility' (maiuscolo)
+          Volatility: m.volatility || 'N/A',
+          // Se nel DB è 'families', l'app vuole 'Families'
+          Families: m.families || {},
+          // Se nel DB è 'description', l'app vuole 'Notes'
+          Notes: m.description || m.notes || 'Nessuna descrizione.'
+        };
+        return acc;
+      }, {});
+      
+      setMaterialsDB(dbObj);
+      console.log("Materiali mappati con successo:", Object.keys(dbObj).length);
     }
-  }, []);
+
+    // Caricamento Formule
+    const { data: forms } = await supabase
+      .from('formulas')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (forms) {
+      setHistory(forms);
+      console.log("Formule caricate:", forms.length);
+    }
+
+  } catch (e) {
+    console.error("ERRORE DURANTE IL CARICAMENTO:", e);
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
+// --- NUOVA FUNZIONE SALVATAGGIO FORMULE ---
+  const saveToHistory = async (formulaToSave: Formula) => {
+  console.log("Inizio procedura di salvataggio...");
+  
+  try {
+    // 1. RICHIESTA TAG (Cartella)
+    const userTag = window.prompt("In quale CARTELLA (Tag) vuoi salvare? (es: FLOREALI, TEST, PROGETTI)", formulaToSave.tag || "GENERALE");
+    if (userTag === null) {
+      console.log("Salvataggio annullato dall'utente (Tag)");
+      return; 
+    }
+
+    // 2. RICHIESTA MATURAZIONE
+    const daysInput = window.prompt("Giorni di maturazione?", (formulaToSave.maturation_days || 30).toString());
+    if (daysInput === null) {
+      console.log("Salvataggio annullato dall'utente (Maturazione)");
+      return;
+    }
+    const days = parseInt(daysInput) || 30;
+
+    // Preparazione dati per Supabase
+    const newEntry = {
+      name: (formulaToSave.name || "Nuova Formula").toUpperCase(),
+      ingredients: formulaToSave.ingredients || [], 
+      description: formulaToSave.description || "",
+      tag: userTag.toUpperCase().trim(),
+      maturation_days: days,
+      date: new Date().toLocaleDateString('it-IT'),
+      created_at: new Date().toISOString()
+    };
+
+    console.log("Dati pronti per l'invio:", newEntry);
+
+    const { error } = await supabase.from('formulas').insert([newEntry]);
+
+    if (error) {
+      console.error("Errore database:", error);
+      throw error;
+    }
+
+    console.log("Salvataggio su Supabase riuscito!");
+    await fetchCloudData(); 
+
+    // 3. LOGICA CALENDARIO (con timeout per evitare blocchi pop-up del browser)
+    setTimeout(() => {
+      const confermaCal = window.confirm("Formula salvata! Vuoi aggiungere il promemoria al calendario?");
+      if (confermaCal) {
+        console.log("Apertura calendario in corso...");
+        addToCalendar(newEntry.name, days);
+      }
+    }, 500);
+
+    // Reset Editor
+    setFormula({
+      id: 'current-draft',
+      name: 'NUOVA CREAZIONE',
+      ingredients: [],
+      date: new Date().toLocaleDateString('it-IT'),
+      tag: 'GENERALE',
+      description: '',
+      maturation_days: 30
+    });
+
+  } catch (error: any) {
+    console.error("Errore globale salvataggio:", error);
+    alert("Si è verificato un errore: " + error.message);
+  }
+};
+const addToCalendar = (name: string, days: number) => {
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + days);
+  
+  // Formato ISO corretto per Google: YYYYMMDD
+  const isoDate = targetDate.toISOString().split('T')[0].replace(/-/g, "");
+  
+  const title = encodeURIComponent(`🧪 TEST: ${name}`);
+  const details = encodeURIComponent(`La maturazione di ${name} è finita.`);
+  
+  // Link completo
+  const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${isoDate}/${isoDate}&details=${details}&sf=true&output=xml`;
+  
+  console.log("URL Calendario generato:", url);
+  window.open(url, '_blank');
+};
+
+const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
+  e.stopPropagation();
+  if (window.confirm("Vuoi eliminare definitivamente questa formula dall'archivio?")) {
+    const { error } = await supabase
+      .from('formulas')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      await fetchCloudData();
+    } else {
+      alert("Errore durante l'eliminazione: " + error.message);
+    }
+  }
+};
 
   useEffect(() => { fetchCloudData(); }, [fetchCloudData]);
 
@@ -314,29 +426,54 @@ function App() {
   // --- 6. LOGICA ARCHIVIO (CLOUD) ---
 
   const archiveFormula = React.useCallback(async () => {
-    if (formula.ingredients.length === 0) return window.alert("La formula è vuota!");
-    
-    const name = window.prompt("Nome creazione:", formula.name);
-    const category = window.prompt("In quale cartella vuoi salvarla? (es. MARINI, INVERNALI)", "GENERALE");
-    
-    if (!name || !category) return;
+  if (formula.ingredients.length === 0) return window.alert("La formula è vuota!");
+  
+  // 1. Chiede il Nome (conferma quello attuale o lo cambia)
+  const name = window.prompt("Nome della creazione:", formula.name);
+  if (!name) return; 
 
-    // Salva nel database Cloud
-    const { error } = await supabase.from('formulas').insert([{
-      name: name.toUpperCase(),
-      ingredients: formula.ingredients,
-      tag: category.toUpperCase().trim(),
-      date: new Date().toLocaleDateString()
-    }]);
+  // 2. Chiede il Tag (La tua cartella)
+  const category = window.prompt("In quale cartella/tag vuoi salvarla?", formula.tag || "GENERALE");
+  if (!category) return;
 
-    if (!error) {
-      window.alert("Formula archiviata in Cloud correttamente!");
-      fetchCloudData(); // Ricarica lo storico
-      setFormula({ id: 'current-draft', name: 'NUOVA CREAZIONE', ingredients: [], date: new Date().toLocaleDateString(), tag: 'LAB-01' });
-    } else {
-      window.alert("Errore salvataggio Formula.");
+  // 3. Chiede i Giorni di Maturazione
+  const daysInput = window.prompt("Giorni di maturazione previsti?", (formula.maturation_days || 30).toString());
+  const days = parseInt(daysInput || "30");
+
+  const newEntry = {
+    name: name.toUpperCase(),
+    ingredients: formula.ingredients,
+    tag: category.toUpperCase().trim(),
+    description: formula.description || "",
+    maturation_days: days,
+    date: new Date().toLocaleDateString('it-IT'),
+    created_at: new Date().toISOString() // Data precisa per il calcolo calendario
+  };
+
+  const { error } = await supabase.from('formulas').insert([newEntry]);
+
+  if (!error) {
+    window.alert("Formula archiviata con successo!");
+    fetchCloudData();
+    
+    // ATTIVAZIONE CALENDARIO: Chiede conferma dopo il salvataggio
+    if (window.confirm(`Vuoi aggiungere il promemoria per il ${new Date(Date.now() + days * 86400000).toLocaleDateString()} sul tuo calendario?`)) {
+      addToCalendar(newEntry.name, days);
     }
-  }, [formula, fetchCloudData]);
+    
+    // Reset dell'editor per una nuova creazione
+    setFormula({ 
+      id: 'current-draft', 
+      name: 'NUOVA CREAZIONE', 
+      ingredients: [], 
+      date: new Date().toLocaleDateString(), 
+      tag: 'GENERALE',
+      maturation_days: 30
+    });
+  } else {
+    window.alert("Errore nel salvataggio su Supabase.");
+  }
+}, [formula, fetchCloudData]);
 
   const loadFromHistory = React.useCallback((savedFormula: any) => {
     if (window.confirm(`Caricare "${savedFormula.name}"? Le modifiche non salvate alla formula corrente andranno perse.`)) {
@@ -344,15 +481,6 @@ function App() {
       setActiveSection('editor');
     }
   }, []);
-
-  const deleteFromHistory = React.useCallback(async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm("Eliminare definitivamente questa formula dall'archivio Cloud?")) {
-      await supabase.from('formulas').delete().eq('id', id);
-      fetchCloudData();
-    }
-  }, [fetchCloudData]);
-
   // --- 7. LOGICA IA GEMINI (USANDO IL DB REATTIVO) ---
   const handleAIQuery = async (queryText: string): Promise<boolean> => {
     if (!queryText || !queryText.trim()) return false;
@@ -481,14 +609,15 @@ function App() {
   };
 
   // Se i dati del database non sono ancora stati scaricati mostriamo il caricamento
-  if (isLoadingDB) {
-    return (
-      <div className="h-screen bg-[#020617] flex flex-col items-center justify-center text-blue-500 gap-4">
-        <Activity size={48} className="animate-pulse" />
-        <h1 className="text-xl font-black tracking-[0.3em] uppercase">Aura Lab Cloud Loading...</h1>
+  if (isLoading) {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-white font-black tracking-widest animate-pulse">
+        AURA LAB CLOUD LOADING...
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div className="flex h-screen bg-[#020617] text-slate-200 overflow-hidden font-sans relative">
@@ -694,7 +823,7 @@ function App() {
               formula={formula} 
               onUpdate={setFormula} 
               ifraAlerts={alerts} 
-              onSave={archiveFormula} 
+              onSave={saveToHistory} 
               onScale={scaleFormula}
               onExport={exportToExcel} 
               onOpenSelector={() => setIsSelecting(true)}

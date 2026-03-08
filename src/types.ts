@@ -11,9 +11,8 @@ export const DILUTION_MAP = {
 export interface Ingredient {
   id: string;
   materialName: string;
-  dilution: keyof typeof DILUTION_MAP; // Vincola la scelta ai valori della mappa
-  weightG: number; // Meglio forzare number per i calcoli
-  costPerGram?: number; 
+  weightG: number | string;
+  dilution: string;
 }
 
 export interface Formula {
@@ -22,8 +21,6 @@ export interface Formula {
   ingredients: Ingredient[];
   date: string;
   tag: string;
-  // Campi Maturazione
-  maturationDays?: number;
-  startDate?: string; 
-  isCompleted?: boolean;
+  description?: string;      // Aggiunto per le note olfattive
+  maturation_days?: number;  // Aggiunto per la maturazione (snake_case per Supabase)
 }
