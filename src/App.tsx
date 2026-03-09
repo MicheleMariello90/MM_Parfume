@@ -517,9 +517,19 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
 });
 
 const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || "Errore API");
+console.log("DEBUG - Dati ricevuti da Gemini:", data); // <-- Questo ti dirà TUTTO
 
-      const aiText = data.candidates[0].content.parts[0].text;
+if (!response.ok) {
+  throw new Error(data.error?.message || "Errore API");
+}
+
+// Estrazione sicura con il punto di domanda (?.)
+const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+if (!aiText) {
+  console.error("Struttura Gemini non valida. Ricevuto:", data);
+  throw new Error("L'IA non ha restituito testo. Controlla la console (F12).");
+}
       const jsonMatch = aiText.match(/\[.*\]/s);
 
       if (jsonMatch) {
