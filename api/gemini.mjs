@@ -1,21 +1,20 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(200).json({ status: "API is online" });
-  }
+  if (req.method !== 'POST') return res.status(200).json({ status: "Online" });
 
   try {
-    // Usiamo gemini-1.5-flash che è il cavallo di battaglia più compatibile
-    const model = "gemini-1.5-flash"; 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // Puntiamo alla versione v1 stabile e al modello 2.0 Flash
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
-    const response = await fetch(url, {
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
     });
 
     const data = await response.json();
-    return res.status(200).json(data);
+    
+    // Rimandiamo indietro tutto quello che dice Google
+    return res.status(response.status).json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
