@@ -504,18 +504,17 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
       Rispondi esclusivamente con un array JSON puro, senza markdown e senza testo prima o dopo.
       Esempio: [{"materialName": "ISO E SUPER", "weightG": 5.0, "dilution": "100%"}]`;
 
-      const response = await fetch('/api/gemini', { 
+      const response = await fetch('/api/gemini', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    contents: [{
+      parts: [{ text: prompt }] // 'prompt' è il testo che invii a Gemini
+    }]
+  })
 });
-
-// AGGIUNGI QUESTO LOG PER IL DEBUG
-if (!response.ok) {
-  const errorBody = await response.text(); 
-  console.error("Il server ha risposto con:", errorBody);
-  throw new Error(`Errore Server: ${response.status}`);
-}
 
 const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || "Errore API");
