@@ -1,14 +1,3 @@
 {
-  "version": 2,
-  "functions": {
-    "src/server/gemini.js": {
-      "runtime": "@vercel/node@3.0"
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/gemini",
-      "destination": "/src/server/gemini.js"
-    }
-  ]
+  "version": 2
 }
