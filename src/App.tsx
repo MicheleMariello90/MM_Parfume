@@ -117,16 +117,23 @@ function App() {
       
       const dbObj = mats.reduce((acc: any, m: any) => {
         // TRADUZIONE FONDAMENTALE: 
-        // Trasformiamo i campi minuscoli di Supabase in quelli attesi dai tuoi componenti
+        // Trasformiamo i campi minuscoli di Supabase in quelli attesi dai componenti
         acc[m.name] = {
           ...m,
           name: m.name,
-          // Se nel DB è 'volatility', l'app vuole 'Volatility' (maiuscolo)
           Volatility: m.volatility || 'N/A',
-          // Se nel DB è 'families', l'app vuole 'Families'
           Families: m.families || {},
-          // Se nel DB è 'description', l'app vuole 'Notes'
-          Notes: m.description || m.notes || 'Nessuna descrizione.'
+          Notes: m.description || m.notes || 'Nessuna descrizione.',
+          
+          // NUOVI CAMPI MAPPATI:
+          IFRA: m.ifra || '',
+          MinUsage: m.min_usage || '',
+          MaxUsage: m.max_usage || '',
+          AverageUsage: m.avg_usage || '',
+          Impact: m.impact || '',
+          CAS: m.cas || '',
+          CostPerGram: m.cost_per_gram || '',
+          PersonalDiary: m.personal_diary || ''
         };
         return acc;
       }, {});
