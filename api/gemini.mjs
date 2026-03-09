@@ -3,7 +3,7 @@ export default async function handler(req, res) {
 
   try {
     // Puntiamo alla versione v1 stabile e al modello 2.0 Flash
-    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const response = await fetch(API_URL, {
       method: 'POST',
