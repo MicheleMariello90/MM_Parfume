@@ -517,18 +517,21 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
 });
 
 const data = await response.json();
-console.log("DEBUG - Dati ricevuti da Gemini:", data); // <-- Questo ti dirà TUTTO
+
+// 1. Log fondamentale per il debug: guarda la console di Chrome (F12)
+console.log("Risposta completa dal server:", data);
 
 if (!response.ok) {
-  throw new Error(data.error?.message || "Errore API");
+  throw new Error(data.error?.message || "Errore del server");
 }
 
-// Estrazione sicura con il punto di domanda (?.)
+// 2. Estrazione sicura con il punto di domanda (?.)
 const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
 if (!aiText) {
-  console.error("Struttura Gemini non valida. Ricevuto:", data);
-  throw new Error("L'IA non ha restituito testo. Controlla la console (F12).");
+  // Se arriviamo qui, Gemini ha risposto ma non c'è testo (es. bloccato dai filtri)
+  console.error("Struttura dati non valida:", data);
+  throw new Error("L'IA non ha restituito una risposta valida. Controlla la console.");
 }
       const jsonMatch = aiText.match(/\[.*\]/s);
 
