@@ -116,27 +116,33 @@ function App() {
       console.log("Materiali grezzi ricevuti:", mats.length);
       
       const dbObj = mats.reduce((acc: any, m: any) => {
-        // TRADUZIONE FONDAMENTALE: 
-        // Trasformiamo i campi minuscoli di Supabase in quelli attesi dai componenti
-        acc[m.name] = {
-          ...m,
-          name: m.name,
-          Volatility: m.volatility || 'N/A',
-          Families: m.families || {},
-          Notes: m.description || m.notes || 'Nessuna descrizione.',
-          
-          // NUOVI CAMPI MAPPATI:
-          IFRA: m.ifra || '',
-          MinUsage: m.min_usage || '',
-          MaxUsage: m.max_usage || '',
-          AverageUsage: m.avg_usage || '',
-          Impact: m.impact || '',
-          CAS: m.cas || '',
-          CostPerGram: m.cost_per_gram || '',
-          PersonalDiary: m.personal_diary || ''
-        };
-        return acc;
-      }, {});
+  acc[m.name] = {
+    ...m, // Prende tutto quello che arriva dal DB
+    name: m.name,
+    
+    // TRADUZIONE CAMPI PER IL MODALE (Maiuscole <-> Minuscole)
+    Volatility: m.volatility || 'N/A',
+    Families: m.families || {},
+    Notes: m.description || m.notes || 'Nessuna descrizione.',
+    
+    // CAMPI TECNICI CHE TI MANCAVANO:
+    BP: m.bp || '',              // Boiling Point
+    VP: m.vp || '',              // Vapor Pressure
+    Impact: m.impact || '',      // Impact
+    
+    // CAMPI REGULATORY:
+    IFRA: m.ifra || '',
+    MinUsage: m.min_usage || '',
+    AvgUsage: m.avg_usage || '',
+    MaxUsage: m.max_usage || '',
+    
+    // ALTRI DETTAGLI:
+    CAS: m.cas || '',
+    CostPerGram: m.cost_per_gram || '',
+    PersonalDiary: m.personal_diary || ''
+  };
+  return acc;
+}, {});
       
       setMaterialsDB(dbObj);
       console.log("Materiali mappati con successo:", Object.keys(dbObj).length);
@@ -306,7 +312,10 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
     'PersonalDiary': 'personal_diary',
     'Impact': 'impact',
     'CAS': 'cas',
-    'CostPerGram': 'cost_per_gram'
+    'CostPerGram': 'cost_per_gram',
+    'BP': 'bp',            // <--- Assicurati che ci sia la virgola qui
+    'VP': 'vp',            // <--- E qui (se è l'ultima riga, la virgola è opzionale ma consigliata)
+    'Description': 'notes',
   };
 
   const dbColumn = fieldMap[field] || field.toLowerCase();
