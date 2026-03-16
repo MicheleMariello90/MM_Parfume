@@ -133,6 +133,111 @@ const MaterialModal = ({
                   </div>
                 </div>
               </div> 
+              {/* --- SEZIONE TYPE E COMPOSIZIONE ALLERGENI --- */}
+                <div className={`mt-6 p-4 sm:p-6 rounded-[1.5rem] border transition-all ${isEditing ? 'border-blue-500/30 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 'border-slate-800 bg-slate-950/50'}`}>
+                  
+                  {/* SELETTORE TIPO MATERIA */}
+                  <div className="mb-6">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 block">
+                      Natura della Materia
+                    </label>
+                    {!isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${data.type === 'Naturale' ? 'bg-emerald-500' : data.type === 'Solvente' ? 'bg-slate-500' : 'bg-blue-500'}`}></span>
+                        <span className="text-sm font-bold text-white uppercase tracking-wider">
+                          {data.type || 'Aroma Chemical'}
+                        </span>
+                      </div>
+                    ) : (
+                      <select 
+                        value={data.type || 'Aroma Chemical'}
+                        onChange={(e) => onUpdate('type', e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white outline-none focus:border-blue-500 transition-all cursor-pointer hover:border-slate-600"
+                      >
+                        <option value="Aroma Chemical">Aroma Chemical</option>
+                        <option value="Naturale">Naturale</option>
+                        <option value="Solvente">Solvente</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {/* SEZIONE COMPOSIZIONE (Visualizzata solo se NON è un solvente) */}
+                  {data.type !== 'Solvente' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                          Composizione / Allergeni
+                        </label>
+                        {isEditing && (
+                          <button 
+                            onClick={() => {
+                              const currentComp = data.composition || {};
+                              onUpdate('composition', { ...currentComp, "": 0 });
+                            }}
+                            className="text-[9px] bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full border border-blue-500/30 font-black hover:bg-blue-500/40 transition-all uppercase tracking-tighter"
+                          >
+                            + Aggiungi Molecola
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                        {Object.entries(data.composition || {}).map(([name, value], idx) => (
+                          <div key={idx} className="flex gap-2 items-center animate-in fade-in slide-in-from-left-2 duration-200">
+                            <input 
+                              disabled={!isEditing}
+                              placeholder="Es. Linalool"
+                              value={name}
+                              onChange={(e) => {
+                                const newComp = { ...data.composition };
+                                const oldValue = newComp[name];
+                                delete newComp[name];
+                                newComp[e.target.value.toUpperCase()] = oldValue;
+                                onUpdate('composition', newComp);
+                              }}
+                              className="flex-1 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[11px] font-bold text-slate-200 outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent uppercase"
+                            />
+                            <div className="relative">
+                              <input 
+                                disabled={!isEditing}
+                                type="number"
+                                placeholder="0"
+                                value={value as number}
+                                onChange={(e) => {
+                                  const newComp = { ...data.composition };
+                                  newComp[name] = Number(e.target.value);
+                                  onUpdate('composition', newComp);
+                                }}
+                                className="w-20 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[11px] text-blue-400 font-mono text-center outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent"
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 font-bold">%</span>
+                            </div>
+                            {isEditing && (
+                              <button 
+                                onClick={() => {
+                                  const newComp = { ...data.composition };
+                                  delete newComp[name];
+                                  onUpdate('composition', newComp);
+                                }}
+                                className="p-2 text-slate-600 hover:text-red-500 transition-colors"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        
+                        {(!data.composition || Object.keys(data.composition).length === 0) && (
+                          <div className="py-4 text-center border-2 border-dashed border-slate-800/50 rounded-2xl">
+                            <p className="text-[10px] text-slate-600 italic uppercase font-medium tracking-widest">
+                              Nessun allergene dichiarato
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
               {/* COLONNA DESTRA: DESCRIZIONE E FAMIGLIE */}
               <div className="space-y-6">

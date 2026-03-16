@@ -23,4 +23,5 @@ export interface Formula {
   tag: string;
   description?: string;      // Aggiunto per le note olfattive
   maturation_days?: number;  // Aggiunto per la maturazione (snake_case per Supabase)
+  composition?: Record<string, number>;
 }

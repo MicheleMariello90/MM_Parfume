@@ -101,70 +101,79 @@ function App() {
 
   const [history, setHistory] = useState<Formula[]>([]);
 
-  // --- 2. FETCH DATI DAL CLOUD (SUPABASE) ---
+ // --- 2. FETCH DATI DAL CLOUD (SUPABASE) ---
   const fetchCloudData = useCallback(async () => {
-  setIsLoading(true);
-  try {
-    console.log("Inizio fetch materiali...");
-    const { data: mats, error: matsError } = await supabase
-      .from('materials')
-      .select('*');
-
-    if (matsError) throw matsError;
-
-    if (mats) {
-      console.log("Materiali grezzi ricevuti:", mats.length);
+    setIsLoading(true);
+    try {
+      console.log("Inizio fetch materiali...");
       
-      const dbObj = mats.reduce((acc: any, m: any) => {
-  acc[m.name] = {
-    ...m, // Prende tutto quello che arriva dal DB
-    name: m.name,
-    
-    // TRADUZIONE CAMPI PER IL MODALE (Maiuscole <-> Minuscole)
-    Volatility: m.volatility || 'N/A',
-    Families: m.families || {},
-    Notes: m.description || m.notes || 'Nessuna descrizione.',
-    
-    // CAMPI TECNICI CHE TI MANCAVANO:
-    BP: m.bp || '',              // Boiling Point
-    VP: m.vp || '',              // Vapor Pressure
-    Impact: m.impact || '',      // Impact
-    
-    // CAMPI REGULATORY:
-    IFRA: m.ifra || '',
-    MinUsage: m.min_usage || '',
-    AvgUsage: m.avg_usage || '',
-    MaxUsage: m.max_usage || '',
-    
-    // ALTRI DETTAGLI:
-    CAS: m.cas || '',
-    CostPerGram: m.cost_per_gram || '',
-    PersonalDiary: m.personal_diary || ''
-  };
-  return acc;
-}, {});
+      // 1. Caricamento Materiali
+      const { data: mats, error: matsError } = await supabase
+        .from('materials')
+        .select('*');
+
+      if (matsError) throw matsError;
+
+      if (mats) {
+        console.log("Materiali grezzi ricevuti:", mats.length);
+        
+        const dbObj = mats.reduce((acc: any, m: any) => {
+          acc[m.name] = {
+            ...m, // Include l'id originale e tutti i campi
+            name: m.name,
+            id: m.id, // Esplicitiamo l'ID per il tasto cancella
+            Type: m.type || 'Material', //
+
+            // TRADUZIONE CAMPI PER IL MODALE
+            Volatility: m.volatility || 'N/A',
+            Families: typeof m.families === 'string' ? JSON.parse(m.families || '{}') : (m.families || {}),
+            Notes: m.description || m.notes || 'Nessuna descrizione.',
+            
+            // CAMPI TECNICI:
+            BP: m.bp || '',
+            VP: m.vp || '',
+            Impact: m.impact || '',
+            
+            // CAMPI REGULATORY:
+           // Usiamo parseFloat per essere sicuri che l'Editor riceva un numero e non una stringa
+           IFRA: (m.ifra !== null && m.ifra !== undefined) ? parseFloat(m.ifra) : 0,
+
+           // Se hai anche queste colonne su Supabase, mappiamole bene:
+          MinUsage: m.min_usage ? parseFloat(m.min_usage) : 0,
+          AvgUsage: m.avg_usage ? parseFloat(m.avg_usage) : 0,
+          MaxUsage: m.max_usage ? parseFloat(m.max_usage) : 100, // Default 100% se non specificato
+            
+            // ALTRI DETTAGLI:
+            CAS: m.cas || '',
+            CostPerGram: m.cost_per_gram || '',
+            PersonalDiary: m.personal_diary || ''
+          };
+          return acc;
+        }, {}); // <--- Qui si chiude il reduce correttamente
+
+        setMaterialsDB(dbObj);
+        console.log("Materiali mappati con successo:", Object.keys(dbObj).length);
+      }
+
+      // 2. Caricamento Formule
+      const { data: forms, error: formsError } = await supabase
+        .from('formulas')
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      setMaterialsDB(dbObj);
-      console.log("Materiali mappati con successo:", Object.keys(dbObj).length);
-    }
+      if (formsError) throw formsError;
 
-    // Caricamento Formule
-    const { data: forms } = await supabase
-      .from('formulas')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (forms) {
-      setHistory(forms);
-      console.log("Formule caricate:", forms.length);
-    }
+      if (forms) {
+        setHistory(forms);
+        console.log("Formule caricate:", forms.length);
+      }
 
-  } catch (e) {
-    console.error("ERRORE DURANTE IL CARICAMENTO:", e);
-  } finally {
-    setIsLoading(false);
-  }
-}, []);
+    } catch (e) {
+      console.error("ERRORE DURANTE IL CARICAMENTO:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []); // <--- Qui si chiude la useCallback correttamente
 // --- NUOVA FUNZIONE SALVATAGGIO FORMULE ---
   const saveToHistory = async (formulaToSave: Formula) => {
   console.log("Inizio procedura di salvataggio...");
@@ -269,19 +278,23 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
   useEffect(() => { fetchCloudData(); }, [fetchCloudData]);
 
   // --- 3. FUNZIONI DI AGGIORNAMENTO MATERIALI (CLOUD) ---
-  const handleAddNewMaterial = useCallback(async () => {
+
+const handleAddNewMaterial = useCallback(async () => {
   const tempName = window.prompt("Nome della nuova materia prima:");
   if (!tempName) return;
   const finalName = tempName.toUpperCase().trim();
 
-  // Usa i nomi delle colonne esattamente come sono nel tuo SQL
+  // Inseriamo i valori come NUMERI (senza virgolette) perché il DB ora è numerico
   const newMaterial = { 
     name: finalName, 
     volatility: "Testa", 
-    ifra: "100",        // Su DB è text
-    min_usage: "0",     // Su DB è text
-    max_usage: "100",   // Su DB è text
-    avg_usage: "0",     // Su DB è text
+    ifra: 100,
+    min_usage: 0,
+    max_usage: 100,
+    avg_usage: 0,
+    bp: 0,
+    vp: 0,
+    impact: 0,
     families: {} 
   };
   
@@ -297,10 +310,9 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
   }
 }, [fetchCloudData]);
 
-  const updateMaterialData = useCallback(async (field: string, value: any) => {
+const updateMaterialData = useCallback(async (field: string, value: any) => {
   if (!selectedMaterialInfo || !field) return;
 
-  // 1. Mappa il nome del campo React al nome della colonna Supabase
   const fieldMap: Record<string, string> = {
     'IFRA': 'ifra',
     'MinUsage': 'min_usage',
@@ -313,68 +325,107 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
     'Impact': 'impact',
     'CAS': 'cas',
     'CostPerGram': 'cost_per_gram',
-    'BP': 'bp',            // <--- Assicurati che ci sia la virgola qui
-    'VP': 'vp',            // <--- E qui (se è l'ultima riga, la virgola è opzionale ma consigliata)
+    'BP': 'bp',
+    'VP': 'vp',
     'Description': 'notes',
   };
 
   const dbColumn = fieldMap[field] || field.toLowerCase();
   
-  // 2. Prepara il valore per il DB (converti in stringa se necessario per le tue colonne 'text')
+  // LOGICA DI PULIZIA: Se il campo deve essere numerico, gestiamo la virgola
   let dbValue = value;
-  if (['ifra', 'min_usage', 'max_usage', 'avg_usage', 'cost_per_gram'].includes(dbColumn)) {
-    dbValue = value?.toString();
+  const numericFields = ['ifra', 'min_usage', 'max_usage', 'avg_usage', 'impact', 'bp', 'vp', 'cost_per_gram'];
+
+  if (numericFields.includes(dbColumn)) {
+    // Trasforma "0,5" in 0.5 (numero)
+    const stringValue = String(value).replace(',', '.');
+    dbValue = parseFloat(stringValue);
+    
+    if (isNaN(dbValue)) dbValue = 0; 
   }
 
-  // 3. Aggiornamento locale (per velocità UI)
+  // Aggiornamento locale immediato
   setMaterialsDB(prev => ({
     ...prev,
-    [selectedMaterialInfo]: { ...prev[selectedMaterialInfo], [field]: value }
+    [selectedMaterialInfo]: { ...prev[selectedMaterialInfo], [field]: dbValue }
   }));
 
-  // 4. Aggiornamento Cloud
+  // Aggiornamento Cloud
   const { error } = await supabase
     .from('materials')
     .update({ [dbColumn]: dbValue })
     .eq('name', selectedMaterialInfo);
 
-  if (error) console.error("Errore salvataggio:", error);
+  if (error) {
+    console.error("Errore salvataggio Cloud:", error);
+  }
 }, [selectedMaterialInfo]);
 
-  const updateFamilyValue = useCallback((family: string, percent: number) => {
-    if (!selectedMaterialInfo) return;
-    const material = materialsDB[selectedMaterialInfo];
-    const newFamilies = { ...(material.Families || {}) };
-    if (percent <= 0) delete newFamilies[family];
-    else newFamilies[family] = percent;
-    
-    updateMaterialData('Families', newFamilies);
-  }, [selectedMaterialInfo, materialsDB, updateMaterialData]);
+const updateFamilyValue = useCallback((family: string, percent: number) => {
+  if (!selectedMaterialInfo) return;
+  const material = materialsDB[selectedMaterialInfo];
+  const newFamilies = { ...(material.Families || {}) };
+  if (percent <= 0) delete newFamilies[family];
+  else newFamilies[family] = percent;
+  
+  updateMaterialData('Families', newFamilies);
+}, [selectedMaterialInfo, materialsDB, updateMaterialData]);
 
-  const toggleVolatility = useCallback((note: string) => {
-    if (!selectedMaterialInfo) return;
-    const material = materialsDB[selectedMaterialInfo];
-    let currentVol = material.Volatility || "";
-    let parts = currentVol === "N/A" ? [] : currentVol.split('/').filter((p: string) => p !== "");
-    
-    if (parts.includes(note)) {
-      parts = parts.filter((p: string) => p !== note);
-    } else {
-      parts.push(note);
-    }
-    const order = ["Testa", "Cuore", "Fondo"];
-    parts.sort((a: string, b: string) => order.indexOf(a) - order.indexOf(b));
-    
-    updateMaterialData('Volatility', parts.length > 0 ? parts.join('/') : "N/A");
-  }, [selectedMaterialInfo, materialsDB, updateMaterialData]);
+const toggleVolatility = useCallback((note: string) => {
+  if (!selectedMaterialInfo) return;
+  const material = materialsDB[selectedMaterialInfo];
+  let currentVol = material.Volatility || "";
+  let parts = currentVol === "N/A" ? [] : currentVol.split('/').filter((p: string) => p !== "");
+  
+  if (parts.includes(note)) {
+    parts = parts.filter((p: string) => p !== note);
+  } else {
+    parts.push(note);
+  }
+  const order = ["Testa", "Cuore", "Fondo"];
+  parts.sort((a: string, b: string) => order.indexOf(a) - order.indexOf(b));
+  
+  updateMaterialData('Volatility', parts.length > 0 ? parts.join('/') : "N/A");
+}, [selectedMaterialInfo, materialsDB, updateMaterialData]);
 
-  const handleDeleteMaterial = useCallback(async (name: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm(`Eliminare definitivamente ${name}?`)) {
-      await supabase.from('materials').delete().eq('name', name);
-      fetchCloudData();
+const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) => {
+  e.stopPropagation();
+
+  const numericId = Number(id);
+  if (isNaN(numericId)) {
+    alert("Errore: ID materiale non valido.");
+    return;
+  }
+
+  if (window.confirm(`Eliminare definitivamente questo materiale?`)) {
+    try {
+      // Eliminiamo basandoci sull'ID numerico
+      const { error } = await supabase
+        .from('materials')
+        .delete()
+        .eq('id', numericId);
+
+      if (error) throw error;
+
+      // Reset immediato dello stato locale per far sparire la card
+      setMaterialsDB(prev => {
+        const newState = { ...prev };
+        const entryToDelete = Object.entries(newState).find(([_, data]: any) => data.id === numericId);
+        if (entryToDelete) {
+          delete newState[entryToDelete[0]];
+        }
+        return newState;
+      });
+
+      // Refresh per sincronia totale
+      await fetchCloudData();
+      
+    } catch (err: any) {
+      console.error("Errore eliminazione:", err);
+      alert("Errore durante l'eliminazione: " + err.message);
     }
-  }, [fetchCloudData]);
+  }
+}, [fetchCloudData]);
 
   // --- 4. LOGICA FORMULA, EXCEL E SCALATURA (INVARIATA) ---
   
@@ -396,13 +447,31 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
 
   const exportToExcel = () => {
     if (formula.ingredients.length === 0) return window.alert("La formula è vuota!");
-    const totalWeight = formula.ingredients.reduce((acc, ing) => acc + (Number(ing.weightG) || 0), 0);
-    let csvContent = "sep=;\n" + "Materia Prima;Diluizione;Peso (g);Percentuale (%)\n";
+    
+    // Peso totale del liquido (tutto ciò che versi)
+    const totalLordo = formula.ingredients.reduce((acc, ing) => acc + (Number(ing.weightG) || 0), 0);
+    
+    let csvContent = "sep=;\n" + "Materia Prima;Diluizione;Peso Lordo (g);Percentuale Assoluta (%)\n";
+    
     formula.ingredients.forEach(ing => {
-      const percentage = totalWeight > 0 ? ((Number(ing.weightG) / totalWeight) * 100).toFixed(3) : "0";
+      const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+      const pureWeight = (Number(ing.weightG) || 0) * ratio;
+      
+      // Calcolo percentuale (Puro su Lordo Totale)
+      const percentage = totalLordo > 0 ? ((pureWeight / totalLordo) * 100).toFixed(3) : "0";
+      
       csvContent += `${ing.materialName};${ing.dilution};${ing.weightG.toString().replace('.', ',')};${percentage.replace('.', ',')}%\n`;
     });
-    csvContent += `\nTOTALE;;${totalWeight.toFixed(3).replace('.', ',')}g;100%`;
+
+    // Calcolo concentrazione totale del mix
+    const totalPuro = formula.ingredients.reduce((acc, ing) => {
+        const r = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+        return acc + (Number(ing.weightG) || 0) * r;
+    }, 0);
+    const totalConcPercentage = totalLordo > 0 ? ((totalPuro / totalLordo) * 100).toFixed(2) : "0.00";
+
+    csvContent += `\nTOTALE;;${totalLordo.toFixed(3).replace('.', ',')}g;${totalConcPercentage.replace('.', ',')}% (Concentrato)`;
+    
     const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.setAttribute("href", URL.createObjectURL(blob));
@@ -629,21 +698,14 @@ if (!aiText) {
   const addMaterialToFormula = (materialName: string) => {
     const newIngredient: Ingredient = {
       id: Math.random().toString(36).substring(2, 9) + Date.now(),
-      materialName, weightG: 0, dilution: "100%" 
+      materialName, 
+      weightG: 0, 
+      dilution: "100%" 
     };
     
-    setFormula({ ...formula, ingredients: [...formula.ingredients, newIngredient] });
+    setFormula(prev => ({ ...prev, ingredients: [...prev.ingredients, newIngredient] }));
     setIsSelecting(false);
-    setSelectorSearch('');
-
-    setTimeout(() => {
-      const inputs = document.querySelectorAll('input[type="number"]');
-      const lastInput = inputs[inputs.length - 1] as HTMLInputElement;
-      if (lastInput) {
-        lastInput.focus();
-        lastInput.select();
-      }
-    }, 50);
+    // Se avevi setSelectorSearch(''), lascialo, altrimenti cancellalo
   };
 
   // Se i dati del database non sono ancora stati scaricati mostriamo il caricamento
@@ -878,15 +940,19 @@ if (!aiText) {
           {/* 1. SEZIONE EDITOR */}
           {activeSection === 'editor' && (
             <FormulaEditor 
-              formula={formula} 
-              onUpdate={setFormula} 
-              ifraAlerts={alerts} 
-              onSave={saveToHistory} 
-              onScale={scaleFormula}
-              onExport={exportToExcel} 
-              onOpenSelector={() => setIsSelecting(true)}
-              onViewMaterial={(name: string) => setSelectedMaterialInfo(name)} 
-            />
+          formula={formula}
+          materialsDB={materialsDB}
+          onUpdate={setFormula}
+          onSave={setFormula}
+          onScale={scaleFormula}
+          onExport={exportToExcel}
+          ifraAlerts={[]} // Non serve più passargli gli alert, se li calcola da solo
+          onOpenSelector={() => setIsSelecting(true)}
+          onViewMaterial={(name) => {
+          setSelectedMaterialInfo(name);
+          setIsEditingMaterial(false);
+         }}
+         />
           )}
 
           {/* 2. SEZIONE LIBRARY */}
