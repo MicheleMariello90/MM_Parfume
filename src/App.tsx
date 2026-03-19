@@ -317,7 +317,7 @@ const updateMaterialData = useCallback(async (field: string, value: any) => {
     'IFRA': 'ifra',
     'MinUsage': 'min_usage',
     'MaxUsage': 'max_usage',
-    'AverageUsage': 'avg_usage',
+    'AvgUsage': 'avg_usage',
     'Notes': 'notes',
     'Volatility': 'volatility',
     'Families': 'families',
