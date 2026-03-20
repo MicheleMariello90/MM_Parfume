@@ -176,45 +176,41 @@ function App() {
   }, []); // <--- Qui si chiude la useCallback correttamente
 // --- NUOVA FUNZIONE SALVATAGGIO FORMULE ---
   const saveToHistory = async (formulaToSave: Formula) => {
-  console.log("Inizio procedura di salvataggio...");
-  
   try {
-    // 1. RICHIESTA TAG (Cartella)
-    const userTag = window.prompt("In quale CARTELLA (Tag) vuoi salvare? (es: FLOREALI, TEST, PROGETTI)", formulaToSave.tag || "GENERALE");
-    if (userTag === null) {
-      console.log("Salvataggio annullato dall'utente (Tag)");
-      return; 
-    }
+    // 1. RICHIESTA TAG
+    const userTag = window.prompt("In quale CARTELLA vuoi salvare?", formulaToSave.tag || "GENERALE");
+    if (userTag === null) return; 
 
-    // 2. RICHIESTA MATURAZIONE
-    const daysInput = window.prompt("Giorni di maturazione?", (formulaToSave.maturation_days || 30).toString());
-    if (daysInput === null) {
-      console.log("Salvataggio annullato dall'utente (Maturazione)");
-      return;
-    }
-    const days = parseInt(daysInput) || 30;
+    // 2. RICHIESTA MATURAZIONE (Forzata)
+    const daysInput = window.prompt("Giorni di maturazione?", "30");
+    if (daysInput === null) return;
+    
+    // TRUCCO: Se l'utente non scrive nulla, usiamo 30 come paracadute
+    const finalDays = parseInt(daysInput) || 30;
 
-    // Preparazione dati per Supabase
     const newEntry = {
       name: (formulaToSave.name || "Nuova Formula").toUpperCase(),
-      ingredients: formulaToSave.ingredients || [], 
+      // Pulisci i dati per Supabase forzando le stringhe
+      ingredients: formulaToSave.ingredients.map(ing => ({
+        id: String(ing.id),
+        materialName: String(ing.materialName),
+        weightG: String(ing.weightG), 
+        dilution: String(ing.dilution)
+      })),
       description: formulaToSave.description || "",
       tag: userTag.toUpperCase().trim(),
-      maturation_days: days,
+      maturation_days: finalDays, // Qui passiamo il numero pulito
       date: new Date().toLocaleDateString('it-IT'),
       created_at: new Date().toISOString()
     };
 
-    console.log("Dati pronti per l'invio:", newEntry);
+    console.log("Tentativo invio a Supabase...", newEntry);
 
     const { error } = await supabase.from('formulas').insert([newEntry]);
 
-    if (error) {
-      console.error("Errore database:", error);
-      throw error;
-    }
+    if (error) throw error;
 
-    console.log("Salvataggio su Supabase riuscito!");
+    alert("✅ Formula salvata con successo!");
     await fetchCloudData(); 
 
     // 3. LOGICA CALENDARIO (con timeout per evitare blocchi pop-up del browser)
@@ -222,7 +218,8 @@ function App() {
       const confermaCal = window.confirm("Formula salvata! Vuoi aggiungere il promemoria al calendario?");
       if (confermaCal) {
         console.log("Apertura calendario in corso...");
-        addToCalendar(newEntry.name, days);
+        // CORRETTO QUI: usiamo finalDays
+        addToCalendar(newEntry.name, finalDays);
       }
     }, 500);
 
@@ -242,6 +239,7 @@ function App() {
     alert("Si è verificato un errore: " + error.message);
   }
 };
+
 const addToCalendar = (name: string, days: number) => {
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + days);
@@ -943,7 +941,7 @@ if (!aiText) {
           formula={formula}
           materialsDB={materialsDB}
           onUpdate={setFormula}
-          onSave={setFormula}
+          onSave={saveToHistory}
           onScale={scaleFormula}
           onExport={exportToExcel}
           ifraAlerts={[]} // Non serve più passargli gli alert, se li calcola da solo
