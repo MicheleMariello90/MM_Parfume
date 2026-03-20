@@ -284,10 +284,21 @@ const isOverIfra = containsViolatedAllergen || isOverDirectLimit;
 
       <td className="hidden md:table-cell py-4 px-4 text-center">
         <input 
-          type="number" step="0.001"
-          className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-slate-500 font-mono text-xs w-24 text-center outline-none"
+          type="text" 
+          inputMode="decimal"
+          className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-white font-mono text-xs w-24 text-center outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
           value={ing.weightG}
-          onChange={(e) => updateIngredient(ing.id, 'weightG', e.target.value)}
+          onChange={(e) => {
+            // 1. IL SANITIZZATORE: Cambia istantaneamente la virgola in punto
+            const sanitizedValue = e.target.value.replace(',', '.');
+            
+            // 2. IL FILTRO: Lascia passare solo numeri e un singolo punto (niente lettere o caratteri strani)
+            if (/^\d*\.?\d*$/.test(sanitizedValue)) {
+              updateIngredient(ing.id, 'weightG', sanitizedValue);
+            }
+          }}
+          // 3. IL FOCUS AUTOMATICO: Se il peso è vuoto o a zero (appena aggiunto), ci entra dentro da solo
+          autoFocus={ing.weightG === '' || ing.weightG === 0 || ing.weightG === '0'}
         />
       </td>
 

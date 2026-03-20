@@ -315,7 +315,7 @@ const updateMaterialData = useCallback(async (field: string, value: any) => {
     'IFRA': 'ifra',
     'MinUsage': 'min_usage',
     'MaxUsage': 'max_usage',
-    'AverageUsage': 'avg_usage',
+    'AvgUsage': 'avg_usage',
     'Notes': 'notes',
     'Volatility': 'volatility',
     'Families': 'families',
@@ -397,7 +397,7 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
 
   if (window.confirm(`Eliminare definitivamente questo materiale?`)) {
     try {
-      // Eliminiamo basandoci sull'ID numerico
+      // 1. ELIMINA DAL CLOUD
       const { error } = await supabase
         .from('materials')
         .delete()
@@ -405,19 +405,14 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
 
       if (error) throw error;
 
-      // Reset immediato dello stato locale per far sparire la card
-      setMaterialsDB(prev => {
-        const newState = { ...prev };
-        const entryToDelete = Object.entries(newState).find(([_, data]: any) => data.id === numericId);
-        if (entryToDelete) {
-          delete newState[entryToDelete[0]];
-        }
-        return newState;
-      });
-
-      // Refresh per sincronia totale
+      // 2. FORZA IL REFRESH TOTALE DAL CLOUD
+      // Invece di calcolare noi cosa eliminare nello stato locale, 
+      // chiediamo a Supabase la lista aggiornata. È più lento di un millisecondo, 
+      // ma è INFALLIBILE e non genera errori di codice.
       await fetchCloudData();
       
+      console.log("Materiale eliminato e lista sincronizzata.");
+
     } catch (err: any) {
       console.error("Errore eliminazione:", err);
       alert("Errore durante l'eliminazione: " + err.message);
@@ -662,7 +657,7 @@ if (!aiText) {
     formula.ingredients.forEach(ing => {
       const mat = materialsDB[ing.materialName];
       if (mat) {
-        const weight = Number(ing.weightG) || 0;
+        const weight = Number(String(ing.weightG).replace(',', '.')) || 0;
         const isSolvent = mat.Type === "Solvente";
         const ratio = isSolvent ? 1 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
         const pureWeight = weight * ratio;
@@ -694,17 +689,22 @@ if (!aiText) {
   }, [formula.ingredients, materialsDB]);
 
   const addMaterialToFormula = (materialName: string) => {
-    const newIngredient: Ingredient = {
-      id: Math.random().toString(36).substring(2, 9) + Date.now(),
-      materialName, 
-      weightG: 0, 
-      dilution: "100%" 
-    };
-    
-    setFormula(prev => ({ ...prev, ingredients: [...prev.ingredients, newIngredient] }));
-    setIsSelecting(false);
-    // Se avevi setSelectorSearch(''), lascialo, altrimenti cancellalo
+  const newIngredient: Ingredient = {
+    // Generiamo un ID unico
+    id: Math.random().toString(36).substring(2, 9) + Date.now(),
+    materialName, 
+    // MODIFICA QUI: Stringa vuota invece di 0 per un inserimento rapido
+    weightG: "", 
+    dilution: "100%" 
   };
+  
+  setFormula(prev => ({ 
+    ...prev, 
+    ingredients: [...prev.ingredients, newIngredient] 
+  }));
+  
+  setIsSelecting(false);
+};
 
   // Se i dati del database non sono ancora stati scaricati mostriamo il caricamento
   if (isLoading) {

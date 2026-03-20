@@ -127,7 +127,7 @@ const MaterialModal = ({
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 text-center">Regulatory Limits</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                     <EditableField label="Min %" value={data.MinUsage || 0} type="number" colorClass="text-blue-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('MinUsage', val)} />
-                    <EditableField label="Avg %" value={data.AverageUsage || 0} type="number" colorClass="text-emerald-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('AverageUsage', val)} />
+                    <EditableField label="Avg %" value={data.AvgUsage || 0} type="number" colorClass="text-emerald-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('AvgUsage', val)} />
                     <EditableField label="Max %" value={data.MaxUsage || 0} type="number" colorClass="text-orange-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('MaxUsage', val)} />
                     <EditableField label="IFRA %" value={data.IFRA || 100} type="number" colorClass="text-slate-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('IFRA', val)} />
                   </div>
