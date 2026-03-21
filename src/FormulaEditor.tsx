@@ -351,39 +351,73 @@ const isOverIfra = containsViolatedAllergen || isOverDirectLimit;
   );
 };
 
-// --- SOTTO-COMPONENTE PIRAMIDE 
+// --- SOTTO-COMPONENTE PIRAMIDE AGGIORNATO (ODT-BASED) ---
 const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, materialsDB: Record<string, any> }) => {
   const analysis = useMemo(() => {
-    return formula.ingredients.map(ing => {
-      const mat = materialsDB[ing.materialName] || {};
-      const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
-      const pureWeight = (Number(ing.weightG) || 0) * ratio;
-      
-      // LOGICA BP/IMPACT:
-      // Se non hai il BP nel database, usiamo dei default basati sulle Notes
-      // Testa: BP basso (~180), Cuore: BP medio (~250), Fondo: BP alto (~350)
-      let bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 260 : 350);
-      const impact = Number(mat.Impact) || 100;
-      
-      // La "Forza Reale" (Power) è Peso x Impatto
-      const power = pureWeight * impact;
+  return formula.ingredients.map(ing => {
+    const mat = materialsDB[ing.materialName] || {};
+    const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+    const pureWeight = (Number(ing.weightG) || 0) * ratio;
+    
+    const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 260 : 350);
+    const odt = parseFloat(mat.ODT || mat.Impact) || 1;
+    const safeODT = odt <= 0 ? 1 : odt;
 
-      return {
-        name: ing.materialName,
-        power,
-        bp,
-        isSolvent: mat.Type === 'Solvente'
-      };
-    }).filter(ing => !ing.isSolvent && ing.power > 0);
-  }, [formula.ingredients, materialsDB]);
+    // 1. Calcoliamo la potenza grezza (Peso / ODT)
+    const rawPower = pureWeight / safeODT;
 
-  // Dividiamo i materiali in base al Boiling Point (Logica BP)
-  const testa = analysis.filter(ing => ing.bp <= 220);          // Molto volatili
-  const cuore = analysis.filter(ing => ing.bp > 220 && ing.bp <= 290); // Medi
-  const fondo = analysis.filter(ing => ing.bp > 290);           // Persistenti
+    // 2. TRASFORMAZIONE LOGARITMICA
+    const totalPower = rawPower > 0 ? Math.log10(rawPower * 100 + 1) * 10 : 0;
 
-  const renderColumn = (title: string, data: typeof analysis, color: string) => {
-    const maxPower = Math.max(...data.map(d => d.power), 1);
+    // --- NUOVA LOGICA DINAMICA: BP + ODT + VP ---
+    const vp = parseFloat(mat.VP) || 0.01; 
+    
+    let pTesta = 0; let pCuore = 0; let pFondo = 0;
+
+    // A. Distribuzione base per Boiling Point (SOGLIE AGGIORNATE)
+    // Testa: < 200°C | Cuore: 200-260°C | Fondo: > 260°C
+    if (bp < 200) {
+      pTesta = totalPower * 0.9; pCuore = totalPower * 0.1; pFondo = 0;
+    } else if (bp >= 200 && bp <= 260) {
+      pTesta = totalPower * 0.2; pCuore = totalPower * 0.7; pFondo = totalPower * 0.1;
+    } else {
+      pTesta = totalPower * 0.05; pCuore = totalPower * 0.15; pFondo = totalPower * 0.8;
+    }
+
+    // B. BOOST VAPOR PRESSURE (Spinta fisica in testa)
+    if (vp > 0.5) {
+      const vpBoost = Math.min(vp * 0.1, 0.3) * totalPower;
+      pTesta += vpBoost;
+      pCuore = Math.max(0, pCuore - (vpBoost * 0.5));
+      pFondo = Math.max(0, pFondo - (vpBoost * 0.5));
+    }
+
+    // C. BOOST ODT (Emergenza olfattiva)
+    if (safeODT < 0.01) {
+      const odtBoost = 0.4 * totalPower; 
+      pTesta += odtBoost;
+      pCuore += totalPower * 0.2; 
+    }
+
+    return {
+      name: ing.materialName,
+      powerTesta: pTesta,
+      powerCuore: pCuore,
+      powerFondo: pFondo,
+      isSolvent: mat.Type === 'Solvente'
+    };
+  }).filter(ing => !ing.isSolvent);
+}, [formula.ingredients, materialsDB]);
+
+  // --- RENDERING DELLA PIRAMIDE DINAMICA ---
+  const renderColumn = (
+    title: string, 
+    data: any[], 
+    powerKey: 'powerTesta' | 'powerCuore' | 'powerFondo', 
+    color: string
+  ) => {
+    const filteredData = data.filter(ing => ing[powerKey] > 0.01);
+    const maxPower = Math.max(...filteredData.map(d => d[powerKey]), 1);
     
     return (
       <div className="flex-1 space-y-4">
@@ -392,21 +426,27 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
           <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">{title}</h4>
         </div>
         <div className="space-y-3">
-          {data.sort((a,b) => b.power - a.power).map((item, i) => (
-            <div key={i} className="group">
-              <div className="flex justify-between text-[9px] mb-1 uppercase font-bold tracking-tight">
-                <span className="text-slate-300 truncate w-28">{item.name}</span>
-                <span className="text-slate-500 font-mono">{Math.round(item.power)}</span>
+          {filteredData
+            .sort((a, b) => b[powerKey] - a[powerKey])
+            .map((item, i) => (
+              <div key={i} className="group">
+                <div className="flex justify-between text-[9px] mb-1 uppercase font-bold tracking-tight">
+                  <span className="text-slate-300 truncate w-28">{item.name}</span>
+                  <span className="text-slate-500 font-mono">
+                    {Math.round(item[powerKey]) > 0 ? Math.round(item[powerKey]) : '<1'}
+                  </span>
+                </div>
+                <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${color} transition-all duration-1000 shadow-[0_0_8px_rgba(0,0,0,0.4)]`}
+                    style={{ width: `${(item[powerKey] / maxPower) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full ${color} transition-all duration-1000 shadow-[0_0_8px_rgba(0,0,0,0.5)]`}
-                  style={{ width: `${(item.power / maxPower) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
-          {data.length === 0 && <div className="py-4 text-center text-[9px] uppercase text-slate-700 italic">No data</div>}
+            ))}
+          {filteredData.length === 0 && (
+            <div className="py-4 text-center text-[9px] uppercase text-slate-700 italic">No data</div>
+          )}
         </div>
       </div>
     );
@@ -415,14 +455,19 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
   return (
     <div className="mt-12 p-8 bg-slate-950/50 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
       <div className="text-center mb-10">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-blue-500 mb-2">Scientific Evolution Analysis</h3>
-        <p className="text-[9px] text-slate-600 uppercase">Basato su BP (Boiling Point) e Impact Factor</p>
+        <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-blue-500 mb-2">
+          Scientific Evolution Analysis
+        </h3>
+        <p className="text-[9px] text-slate-600 uppercase">
+          Dynamic BP, ODT & Vapor Pressure Mapping
+        </p>
       </div>
       
       <div className="flex flex-col md:flex-row gap-10">
-        {renderColumn("Top (BP < 220°C)", testa, "bg-yellow-400")}
-        {renderColumn("Heart (BP 220-290°C)", cuore, "bg-rose-500")}
-        {renderColumn("Base (BP > 290°C)", fondo, "bg-indigo-600")}
+        {/* TITOLI AGGIORNATI CON LE NUOVE SOGLIE */}
+        {renderColumn("Top (< 200°C)", analysis, "powerTesta", "bg-yellow-400")}
+        {renderColumn("Heart (200-260°C)", analysis, "powerCuore", "bg-rose-500")}
+        {renderColumn("Base (> 260°C)", analysis, "powerFondo", "bg-indigo-600")}
       </div>
     </div>
   );

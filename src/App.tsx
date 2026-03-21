@@ -132,7 +132,7 @@ function App() {
             // CAMPI TECNICI:
             BP: m.bp || '',
             VP: m.vp || '',
-            Impact: m.impact || '',
+            ODT: m.impact || '', // Mappiamo la colonna 'impact' del DB sulla proprietà 'ODT' dell'app
             
             // CAMPI REGULATORY:
            // Usiamo parseFloat per essere sicuri che l'Editor riceva un numero e non una stringa
@@ -320,6 +320,7 @@ const updateMaterialData = useCallback(async (field: string, value: any) => {
     'Volatility': 'volatility',
     'Families': 'families',
     'PersonalDiary': 'personal_diary',
+    'ODT': 'impact',
     'Impact': 'impact',
     'CAS': 'cas',
     'CostPerGram': 'cost_per_gram',
@@ -644,49 +645,63 @@ if (!aiText) {
     }
   };
 
-  // --- 8. LOGICA DI CALCOLO (PIRAMIDE E AVVISI IFRA) ---
-  const { analysis, alerts } = useMemo(() => {
-    const familyTotals: Record<string, number> = {};
-    let currentTotalWeight = 0; 
-    const ifraAlerts: string[] = [];
+  // --- 8. LOGICA DI CALCOLO AGGIORNATA (ODT-BASED) ---
+const { analysis, alerts } = useMemo(() => {
+  const familyTotals: Record<string, number> = {};
+  let currentTotalWeight = 0; 
+  const ifraAlerts: string[] = [];
 
-    formula.ingredients.forEach(ing => {
-      currentTotalWeight += Number(ing.weightG) || 0;
-    });
+  // Calcolo peso totale per IFRA
+  formula.ingredients.forEach(ing => {
+    currentTotalWeight += Number(String(ing.weightG).replace(',', '.')) || 0;
+  });
 
-    formula.ingredients.forEach(ing => {
-      const mat = materialsDB[ing.materialName];
-      if (mat) {
-        const weight = Number(String(ing.weightG).replace(',', '.')) || 0;
-        const isSolvent = mat.Type === "Solvente";
-        const ratio = isSolvent ? 1 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
-        const pureWeight = weight * ratio;
+  formula.ingredients.forEach(ing => {
+    const mat = materialsDB[ing.materialName];
+    if (mat) {
+      const weight = Number(String(ing.weightG).replace(',', '.')) || 0;
+      const isSolvent = mat.Type === "Solvente";
+      const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+      const pureWeight = weight * ratio;
 
-        if (currentTotalWeight > 0 && !isSolvent) {
-          const concentration = (pureWeight / currentTotalWeight) * 100;
-          if (mat.IFRA !== null && concentration > mat.IFRA) {
-            ifraAlerts.push(ing.materialName);
-          }
-        }
-
-        if (!isSolvent && mat.Families) {
-          const impact = (mat as any).Impact || 100;
-          const effectivePower = pureWeight * impact;
-          Object.entries(mat.Families).forEach(([family, percentage]) => {
-            familyTotals[family] = (familyTotals[family] || 0) + (effectivePower * (percentage as number) / 100);
-          });
+      // Controllo IFRA (rimane basato sul peso, corretto così)
+      if (currentTotalWeight > 0 && !isSolvent) {
+        const concentration = (pureWeight / currentTotalWeight) * 100;
+        if (mat.IFRA !== null && concentration > mat.IFRA) {
+          ifraAlerts.push(ing.materialName);
         }
       }
-    });
 
-    const scores = Object.values(familyTotals);
-    const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
-    const finalAnalysis = Object.entries(familyTotals)
-      .map(([name, value]) => ({ name, percentage: highestScore > 0 ? (value / highestScore) * 100 : 0 }))
-      .sort((a, b) => b.percentage - a.percentage);
+      // --- NUOVA LOGICA ODT PER SIDEBAR ---
+      if (!isSolvent && mat.Families) {
+        // Usiamo ODT o Impact (che ora contiene il valore della soglia)
+        const odtValue = parseFloat(mat.ODT || mat.Impact || 1);
+        
+        // Protezione: se l'ODT è <= 0, lo impostiamo a 1 per non rompere il calcolo
+        const safeODT = odtValue <= 0 ? 1 : odtValue;
+        
+        // POTENZA REALE = PESO / ODT
+        const effectivePower = pureWeight / safeODT;
 
-    return { analysis: finalAnalysis, alerts: ifraAlerts };
-  }, [formula.ingredients, materialsDB]);
+        Object.entries(mat.Families).forEach(([family, percentage]) => {
+          familyTotals[family] = (familyTotals[family] || 0) + (effectivePower * (Number(percentage) / 100));
+        });
+      }
+    }
+  });
+
+  const scores = Object.values(familyTotals);
+  const highestScore = scores.length > 0 ? Math.max(...scores) : 1;
+  
+  const finalAnalysis = Object.entries(familyTotals)
+    .map(([name, value]) => ({ 
+      name, 
+      percentage: (value / highestScore) * 100 
+    }))
+    .sort((a, b) => b.percentage - a.percentage);
+
+  return { analysis: finalAnalysis, alerts: ifraAlerts };
+}, [formula.ingredients, materialsDB]);
 
   const addMaterialToFormula = (materialName: string) => {
   const newIngredient: Ingredient = {
@@ -702,7 +717,7 @@ if (!aiText) {
     ...prev, 
     ingredients: [...prev.ingredients, newIngredient] 
   }));
-  
+  setSearchTerm(""); // Pulisce la barra "Cerca materiale..."
   setIsSelecting(false);
 };
 

@@ -110,29 +110,75 @@ const MaterialModal = ({
           <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               
-              {/* COLONNA SINISTRA: DATI TECNICI */}
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <EditableField label="CAS Number" value={data.CAS || ''} isReadOnly={!isEditing} onSave={(val:any) => onUpdate('CAS', val)} />
-                  <EditableField label="Costo g (€)" value={data.CostPerGram || 0} type="number" colorClass="text-emerald-400" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('CostPerGram', val)} />
-                </div>
+              {/* COLONNA SINISTRA: DATI TECNICI AGGIORNATI */}
+<div className="space-y-6">
+  <div className="grid grid-cols-3 gap-3">
+    <EditableField 
+      label="BP (°C)" 
+      value={data.BP || 0} 
+      type="number" 
+      colorClass="text-blue-300" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('BP', val)} 
+    />
+    <EditableField 
+      label="VP" 
+      value={data.VP || ''} 
+      colorClass="text-purple-300" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('VP', val)} 
+    />
+    {/* CAMBIO LOGICA: Da Impact a ODT (Soglia Olfattiva) */}
+    <EditableField 
+      label="ODT (↓)" 
+      value={data.ODT || data.Impact || 0} 
+      type="number" 
+      colorClass="text-orange-400 font-black" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('impact', val)} 
+    />
+  </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                  <EditableField label="BP (°C)" value={data.BP || 0} type="number" colorClass="text-blue-300" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('BP', val)} />
-                  <EditableField label="VP" value={data.VP || ''} colorClass="text-purple-300" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('VP', val)} />
-                  <EditableField label="Impact" value={data.Impact || 0} type="number" colorClass="text-orange-400 font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('Impact', val)} />
-                </div>
-
-                <div className={`bg-slate-950/50 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'}`}>
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 text-center">Regulatory Limits</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                    <EditableField label="Min %" value={data.MinUsage || 0} type="number" colorClass="text-blue-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('MinUsage', val)} />
-                    <EditableField label="Avg %" value={data.AvgUsage || 0} type="number" colorClass="text-emerald-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('AvgUsage', val)} />
-                    <EditableField label="Max %" value={data.MaxUsage || 0} type="number" colorClass="text-orange-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('MaxUsage', val)} />
-                    <EditableField label="IFRA %" value={data.IFRA || 100} type="number" colorClass="text-slate-400 text-base font-black" isReadOnly={!isEditing} onSave={(val:any) => onUpdate('IFRA', val)} />
-                  </div>
-                </div>
-              </div> 
+  <div className={`bg-slate-950/50 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'}`}>
+    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 text-center">
+      Regulatory Limits
+    </h4>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+      <EditableField 
+        label="Min %" 
+        value={data.MinUsage || 0} 
+        type="number" 
+        colorClass="text-blue-400 text-base font-black" 
+        isReadOnly={!isEditing} 
+        onSave={(val: any) => onUpdate('MinUsage', val)} 
+      />
+      <EditableField 
+        label="Avg %" 
+        value={data.AvgUsage || 0} 
+        type="number" 
+        colorClass="text-emerald-400 text-base font-black" 
+        isReadOnly={!isEditing} 
+        onSave={(val: any) => onUpdate('AvgUsage', val)} 
+      />
+      <EditableField 
+        label="Max %" 
+        value={data.MaxUsage || 0} 
+        type="number" 
+        colorClass="text-orange-400 text-base font-black" 
+        isReadOnly={!isEditing} 
+        onSave={(val: any) => onUpdate('MaxUsage', val)} 
+      />
+      <EditableField 
+        label="IFRA %" 
+        value={data.IFRA || 100} 
+        type="number" 
+        colorClass="text-slate-400 text-base font-black" 
+        isReadOnly={!isEditing} 
+        onSave={(val: any) => onUpdate('IFRA', val)} 
+      />
+    </div>
+  </div>
+</div> 
               {/* --- SEZIONE TYPE E COMPOSIZIONE ALLERGENI --- */}
                 <div className={`mt-6 p-4 sm:p-6 rounded-[1.5rem] border transition-all ${isEditing ? 'border-blue-500/30 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 'border-slate-800 bg-slate-950/50'}`}>
                   
