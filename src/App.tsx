@@ -3,8 +3,7 @@ import { supabase } from './supabaseClient';
 import FormulaEditor from './FormulaEditor';
 import { Formula, Ingredient } from './types';
 import { FAMILY_COLORS, DILUTION_MAP } from './constants';
-import { Beaker, Book, Search, Activity, AlertTriangle, X, Plus, Database, Trash2, ChevronRight, BookOpen, Menu } from 'lucide-react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Beaker, Book, Search, Activity, AlertTriangle, X, Plus, Menu, Droplets } from 'lucide-react';
 import './index.css';
 
 import MaterialModal from './MaterialModal';
@@ -717,17 +716,42 @@ const { analysis, alerts } = useMemo(() => {
     ...prev, 
     ingredients: [...prev.ingredients, newIngredient] 
   }));
-  setSearchTerm(""); // Pulisce la barra "Cerca materiale..."
+  setSearchTerm(""); // Pulisce la barra IA
+  setSelectorSearch(""); // Pulisce la barra "Cerca materiale..."
   setIsSelecting(false);
 };
 
-  // Se i dati del database non sono ancora stati scaricati mostriamo il caricamento
-  if (isLoading) {
+  // --- SCHERMATA DI CARICAMENTO CON LOGO ---
+
+if (isLoading) {
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-white font-black tracking-widest animate-pulse">
-        Meriti ciò che sogni...
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-12 p-10">
+      
+      {/* 1. IL TUO LOGO (con animazione pulse opzionale) */}
+      <img 
+        src="/logo.png" 
+        alt="Logo My Perfume Lab" 
+        className="w-32 h-32 object-contain animate-pulse-slow" // Regola la grandezza qui
+      />
+
+      {/* 2. LO SPINNER TECNICO (Cerchio che gira) */}
+      <div className="relative w-16 h-16">
+        {/* Cerchio di sfondo opaco */}
+        <div className="absolute inset-0 rounded-full border-4 border-slate-800"></div>
+        {/* Cerchio che gira blu */}
+        <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
       </div>
+
+      {/* 3. LA FRASE BREVE */}
+      <div className="text-center space-y-2">
+        <p className="text-white text-sm font-medium tracking-wide">
+        ...
+        </p>
+        <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">
+          Caricamento database
+        </p>
+      </div>
+
     </div>
   );
 }
@@ -831,8 +855,8 @@ const { analysis, alerts } = useMemo(() => {
 
         <nav className="w-full px-4 space-y-1 mb-8">
           {[
-            { id: 'editor', icon: <Beaker size={16}/>, label: 'Editor' },
-            { id: 'library', icon: <Book size={16}/>, label: 'Library' },
+            { id: 'editor', icon: <Beaker size={16}/>, label: 'Laboratorio' },
+            { id: 'library', icon: <Droplets size={16}/>, label: 'Materie Prime' },
           ].map((item) => (
             <button 
               key={item.id} 
@@ -850,7 +874,7 @@ const { analysis, alerts } = useMemo(() => {
               activeSection === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-800'
             }`}
           >
-            <Search size={16}/> Archivio
+            <Search size={16}/> Archivio Formule
           </button>
         </nav>
 
@@ -971,17 +995,6 @@ const { analysis, alerts } = useMemo(() => {
           {/* 2. SEZIONE LIBRARY */}
           {activeSection === 'library' && (
             <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 px-2">
-                <div />
-                <button 
-                  onClick={handleAddNewMaterial}
-                  className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-500/20 group active:scale-95 w-full md:w-auto justify-center"
-                >
-                  <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
-                  <span className="text-[11px] font-black uppercase tracking-[0.2em]">Aggiungi Materiale</span>
-                </button>
-              </div>
-
               <MaterialLibrary 
                 materialsDB={materialsDB}
                 searchTerm={searchTerm}
@@ -990,6 +1003,7 @@ const { analysis, alerts } = useMemo(() => {
                   setIsEditingMaterial(false);
                 }}
                 onDeleteMaterial={handleDeleteMaterial}
+                onAddMaterial={handleAddNewMaterial}
                 familyColors={FAMILY_COLORS}
               />
             </div>
