@@ -110,47 +110,47 @@ const MaterialModal = ({
           <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               
-              {/* COLONNA SINISTRA: DATI TECNICI AGGIORNATI */}
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {/* NUOVO CAMPO CAS AGGIUNTO QUI */}
-                  <EditableField 
-                    label="CAS" 
-                    value={data.cas || ''} 
-                    type="text" 
-                    colorClass="text-yellow-300 font-mono" 
-                    isReadOnly={!isEditing} 
-                    onSave={(val: any) => onUpdate('cas', val)} 
-                  />
-                  <EditableField 
-                    label="BP (°C)" 
-                    value={data.BP || 0} 
-                    type="number" 
-                    colorClass="text-blue-300" 
-                    isReadOnly={!isEditing} 
-                    onSave={(val: any) => onUpdate('BP', val)} 
-                  />
-                  <EditableField 
-                    label="VP" 
-                    value={data.VP || ''} 
-                    colorClass="text-purple-300" 
-                    isReadOnly={!isEditing} 
-                    onSave={(val: any) => onUpdate('VP', val)} 
-                  />
-                  <EditableField 
-                    label="ODT (↓)" 
-                    value={data.ODT || data.Impact || 0} 
-                    type="number" 
-                    colorClass="text-orange-400 font-black" 
-                    isReadOnly={!isEditing} 
-                    onSave={(val: any) => onUpdate('impact', val)} 
-                  />
-                </div>
+              {/* COLONNA SINISTRA: DATI TECNICI AGGIORNATI CON IMPACT LOGIC */}
+<div className="space-y-6">
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <EditableField 
+      label="CAS" 
+      value={data.cas || ''} 
+      type="text" 
+      colorClass="text-yellow-300 font-mono" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('cas', val)} 
+    />
+    <EditableField 
+      label="BP (°C)" 
+      value={data.BP || 0} 
+      type="number" 
+      colorClass="text-blue-300" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('BP', val)} 
+    />
+    <EditableField 
+      label="VP" 
+      value={data.VP || ''} 
+      colorClass="text-purple-300" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('VP', val)} 
+    />
+    {/* LOGICA INVERTITA: Ora Impact è a salire (↑) */}
+    <EditableField 
+      label="IMPACT (↑)" 
+      value={data.impact || 0} 
+      type="number" 
+      colorClass="text-orange-400 font-black" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('impact', Number(val))} 
+    />
+  </div>
 
-                <div className={`bg-slate-950/50 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'}`}>
-                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 text-center">
-                    Regulatory Limits
-                  </h4>
+  <div className={`bg-slate-950/50 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'}`}>
+    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 text-center">
+      Regulatory Limits
+    </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                     <EditableField 
                       label="Min %" 

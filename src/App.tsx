@@ -671,19 +671,26 @@ const { analysis, alerts } = useMemo(() => {
         }
       }
 
-      // --- NUOVA LOGICA ODT PER SIDEBAR ---
+      // --- LOGICA IMPACT + BP (VOLATILITÀ) ---
       if (!isSolvent && mat.Families) {
-        // Usiamo ODT o Impact (che ora contiene il valore della soglia)
-        const odtValue = parseFloat(mat.ODT || mat.Impact || 1);
+        // 1. Recupero Impact (Forza) - Default 10
+        const impactVal = parseFloat(mat.impact || mat.Impact || mat.ODT || 10);
         
-        // Protezione: se l'ODT è <= 0, lo impostiamo a 1 per non rompere il calcolo
-        const safeODT = odtValue <= 0 ? 1 : odtValue;
-        
-        // POTENZA REALE = PESO / ODT
-        const effectivePower = pureWeight / safeODT;
+        // 2. Recupero BP (Persistenza) - Se manca usiamo 250 come standard
+        // Nota: usiamo Number() per sicurezza se il dato arriva come stringa
+        const rawBP = mat.BP || mat.bp || 250;
+        const bpVal = Number(String(rawBP).replace(',', '.'));
+
+        // 3. CALCOLO POTENZA BILANCIATA
+        // Se il BP è < 200 (Note di Testa come il Bergamotto), il fattore sarà < 1
+        // Se il BP è > 250 (Note di Fondo), il fattore sarà > 1
+        const bpFactor = bpVal / 250; 
+        const effectivePower = pureWeight * impactVal * bpFactor;
 
         Object.entries(mat.Families).forEach(([family, percentage]) => {
-          familyTotals[family] = (familyTotals[family] || 0) + (effectivePower * (Number(percentage) / 100));
+          const familyPercent = Number(percentage) || 0;
+          const currentScore = familyTotals[family] || 0;
+          familyTotals[family] = currentScore + (effectivePower * (familyPercent / 100));
         });
       }
     }

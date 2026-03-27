@@ -359,44 +359,33 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
     const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
     const pureWeight = (Number(ing.weightG) || 0) * ratio;
     
+    // 1. BP e IMPACT (usiamo la moltiplicazione per valorizzare il 900 del Calone)
     const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 260 : 350);
-    const odt = parseFloat(mat.ODT || mat.Impact) || 1;
-    const safeODT = odt <= 0 ? 1 : odt;
-
-    // 1. Calcoliamo la potenza grezza (Peso / ODT)
-    const rawPower = pureWeight / safeODT;
-
-    // 2. TRASFORMAZIONE LOGARITMICA
-    const totalPower = rawPower > 0 ? Math.log10(rawPower * 100 + 1) * 10 : 0;
-
-    // --- NUOVA LOGICA DINAMICA: BP + ODT + VP ---
-    const vp = parseFloat(mat.VP) || 0.01; 
+    const impact = parseFloat(mat.impact || mat.Impact || 10);
     
+    // 2. POTENZA LINEARE (Rimuoviamo il Log10 per non schiacciare le differenze)
+    // Ora Calone (0.2 * 900 = 180) vs Bergamotto (0.2 * 10 = 2)
+    const totalPower = pureWeight * impact;
+
+    const vp = parseFloat(mat.VP) || 0.01; 
     let pTesta = 0; let pCuore = 0; let pFondo = 0;
 
-    // A. Distribuzione base per Boiling Point (SOGLIE AGGIORNATE)
-    // Testa: < 200°C | Cuore: 200-260°C | Fondo: > 260°C
+    // 3. DISTRIBUZIONE DINAMICA BP
     if (bp < 200) {
-      pTesta = totalPower * 0.9; pCuore = totalPower * 0.1; pFondo = 0;
+      // Testa pura (es. Bergamotto) - sparisce quasi del tutto dopo la testa
+      pTesta = totalPower; pCuore = totalPower * 0.05; pFondo = 0;
     } else if (bp >= 200 && bp <= 260) {
-      pTesta = totalPower * 0.2; pCuore = totalPower * 0.7; pFondo = totalPower * 0.1;
+      // Cuore (es. Calone) - presente ovunque ma picco nel cuore
+      pTesta = totalPower * 0.4; pCuore = totalPower; pFondo = totalPower * 0.6;
     } else {
-      pTesta = totalPower * 0.05; pCuore = totalPower * 0.15; pFondo = totalPower * 0.8;
+      // Fondo (es. Muschi) - cresce man mano
+      pTesta = totalPower * 0.1; pCuore = totalPower * 0.4; pFondo = totalPower;
     }
 
-    // B. BOOST VAPOR PRESSURE (Spinta fisica in testa)
+    // 4. BOOST VAPOR PRESSURE (Spinta fisica immediata)
     if (vp > 0.5) {
-      const vpBoost = Math.min(vp * 0.1, 0.3) * totalPower;
+      const vpBoost = Math.min(vp * 0.2, 0.5) * totalPower;
       pTesta += vpBoost;
-      pCuore = Math.max(0, pCuore - (vpBoost * 0.5));
-      pFondo = Math.max(0, pFondo - (vpBoost * 0.5));
-    }
-
-    // C. BOOST ODT (Emergenza olfattiva)
-    if (safeODT < 0.01) {
-      const odtBoost = 0.4 * totalPower; 
-      pTesta += odtBoost;
-      pCuore += totalPower * 0.2; 
     }
 
     return {
