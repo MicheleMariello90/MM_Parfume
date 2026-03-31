@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import FormulaEditor from './FormulaEditor';
 import { Formula, Ingredient } from './types';
 import { FAMILY_COLORS, DILUTION_MAP } from './constants';
-import { Beaker, Book, Search, Activity, AlertTriangle, X, Plus, Menu, Droplets } from 'lucide-react';
+import { Book, Search, Activity, AlertTriangle, X, Plus, Menu, Droplets, FlaskConical } from 'lucide-react';
 import './index.css';
 
 import MaterialModal from './MaterialModal';
@@ -843,75 +843,91 @@ if (isLoading) {
         </div>
       )}
 
-      {/* 2. SIDEBAR LATERALE (Ora con classi responsive per il drawer) */}
-      <aside className={`
-        fixed md:relative z-50 h-full w-72 border-r border-slate-800 bg-slate-900 flex flex-col py-10 shrink-0 overflow-hidden transition-transform duration-300 ease-in-out
-        ${isMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-      `}>
-        
-        {/* LOGO AZIENDALE */}
-        <div className="flex flex-col items-center w-full px-6 mb-8">
-          <img 
-            src="/logo.png" 
-            className="w-28 h-28 object-contain mb-4 cursor-pointer hover:scale-105 transition-transform" 
-            onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
-            alt="Logo Aura Lab"
-          />
-          <div className="w-16 h-0.5 bg-blue-500/30 rounded-full"></div>
-        </div>
+      {/* 2. SIDEBAR LATERALE - ULTRA-SELECTIVE MINIMALIST */}
+<aside className={`
+  fixed md:relative z-50 h-full w-64 border-r border-slate-800/40 flex flex-col py-10 shrink-0 overflow-hidden transition-all duration-500
+  ${isMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+  bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#000000_100%)]
+`}>
+  
+  {/* LOGO AZIENDALE */}
+  <div className="flex flex-col items-center w-full px-6 mb-12">
+    <img 
+      src="/logo.png" 
+      className="w-32 h-32 object-contain cursor-pointer hover:scale-105 transition-transform" 
+      onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
+      alt="Logo Aura Lab"
+    />
+  </div>
 
-        <nav className="w-full px-4 space-y-1 mb-8">
-          {[
-            { id: 'editor', icon: <Beaker size={16}/>, label: 'Laboratorio' },
-            { id: 'library', icon: <Droplets size={16}/>, label: 'Materie Prime' },
-          ].map((item) => (
-            <button 
-              key={item.id} 
-              onClick={() => { setActiveSection(item.id as Section); setIsMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
-                activeSection === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-800'
-              }`}
-            >
-              {item.icon} {item.label}
-            </button>
-          ))}
-          <button 
-            onClick={() => { setActiveSection('history'); setIsMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
-              activeSection === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500 hover:bg-slate-800'
-            }`}
-          >
-            <Search size={16}/> Archivio Formule
-          </button>
-        </nav>
+  <div className="flex-1 w-full flex flex-col justify-between overflow-hidden">
+    
+    {/* NAVIGAZIONE */}
+    <nav className="w-full px-4 space-y-1">
+      <button 
+        onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
+        className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
+          activeSection === 'editor' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
+        }`}
+      >
+        <FlaskConical size={16} className={activeSection === 'editor' ? 'text-blue-400' : 'text-slate-500'} />
+        <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Laboratorio</span>
+      </button>
 
-        {/* ANALISI OLFATTIVA (PROFILES) */}
-        <div className="flex-1 w-full overflow-y-auto custom-scrollbar">
-          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-2 mx-6">
-            <div className="flex items-center gap-2">
-              <Activity size={12} className="text-blue-500" />
-              <h3 className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Profiles</h3>
-            </div>
-            {alerts.length > 0 && <AlertTriangle size={12} className="text-red-500 animate-pulse" />}
-          </div>
-          
-          <div className="space-y-1.5 pl-2 pr-0">
-            {analysis.map((fam) => (
-              <div key={fam.name} className="flex items-center group h-4">
-                <span className="w-16 text-right pr-2 text-[9px] font-bold text-slate-500 group-hover:text-slate-200 transition-colors truncate uppercase tracking-tighter">
-                  {fam.name}
-                </span>
-                <div className="flex-1 h-full flex items-center relative">
-                  <div className="h-[6px] rounded-r-sm transition-all duration-700 ease-out relative" 
-                       style={{ width: `${fam.percentage}%`, backgroundColor: FAMILY_COLORS[fam.name as keyof typeof FAMILY_COLORS] || "#808080" }}>
-                    <div className="absolute inset-y-0 right-0 w-[2px] bg-white/30 rounded-r-sm"></div>
-                  </div>
+      <button 
+        onClick={() => { setActiveSection('library'); setIsMenuOpen(false); }}
+        className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
+          activeSection === 'library' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
+        }`}
+      >
+        <Droplets size={16} className={activeSection === 'library' ? 'text-blue-400' : 'text-slate-500'} />
+        <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Materie Prime</span>
+      </button>
+
+      <button 
+        onClick={() => { setActiveSection('history'); setIsMenuOpen(false); }}
+        className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
+          activeSection === 'history' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
+        }`}
+      >
+        <Search size={16} className={activeSection === 'history' ? 'text-blue-400' : 'text-slate-500'} />
+        <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Archivio Formule</span>
+      </button>
+    </nav>
+
+    {/* PROFILES - SOLO > 20% CON TESTO DINAMICO */}
+    <div className="mb-10 px-6">
+      <div className="flex flex-col gap-1.5">
+        {analysis
+          .filter(fam => fam.percentage >= 20) // Filtro aumentato al 20%
+          .map((fam) => {
+            // Logica Colore Testo: Nero per Vanigliato e famiglie chiare
+            const lightFamilies = ["AGRUMATO", "CREMOSO", "FRESCO", "SALATO", "VANIGLIATO", "TALCATO", "MUSCHIATO", "LATTONICO", "MIELATO", "OZONICO", "FLOREALE BIANCO", "GOURMAND"];
+            const isLightColor = lightFamilies.includes(fam.name.toUpperCase());
+            
+            return (
+              <div key={fam.name} className="relative w-full h-[18px]">
+                <div 
+                  className="h-full transition-all duration-1000 ease-out flex items-center px-2.5 rounded-[2px]" 
+                  style={{ 
+                    width: `${fam.percentage}%`, 
+                    backgroundColor: FAMILY_COLORS[fam.name as keyof typeof FAMILY_COLORS] || "#444" 
+                  }}
+                >
+                  <span className={`text-[9px] font-semibold lowercase tracking-tight truncate ${
+                    isLightColor ? 'text-black' : 'text-white'
+                  }`}>
+                    {fam.name}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </aside>
+            );
+          })}
+      </div>
+    </div>
+
+  </div>
+</aside>
 
       {/* 3. OVERLAY DI SFONDO MOBILE (Chiude il menu toccando fuori) */}
       {isMenuOpen && (

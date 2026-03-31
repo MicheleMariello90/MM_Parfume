@@ -167,17 +167,26 @@ const MaterialLibrary = React.memo(({
                 {data.notes || data.Notes || data.description || 'Nessuna descrizione.'}
               </p>       
               
-              {/* Tag Famiglie */}
+              {/* Tag Famiglie con contrasto intelligente */}
               <div className="flex flex-wrap gap-2">
-                {Object.keys(familiesObj).map(f => (
-                  <span 
-                    key={f} 
-                    className="text-[7px] px-3 py-1 rounded-full font-black text-white uppercase tracking-tighter" 
-                    style={{ backgroundColor: familyColors[f] || '#475569' }}
-                  >
-                    {f}
-                  </span>
-                ))}
+                {Object.keys(familiesObj).map(f => {
+                  const lightFamilies = [
+                    "AGRUMATO", "CREMOSO", "FRESCO", "SALATO", "GOURMAND", "MIELATO", "VANIGLIATO", "TALCATO", "MUSCHIATO", "LATTONICO", "OZONICO", "FLOREALE BIANCO"
+                  ];
+                  const isLightColor = lightFamilies.includes(f.toUpperCase().trim());
+
+                  return (
+                    <span 
+                      key={f} 
+                      className={`text-[7px] px-3 py-1 rounded-full font-black uppercase tracking-tighter ${
+                        isLightColor ? 'text-black' : 'text-white'
+                      }`} 
+                      style={{ backgroundColor: familyColors[f] || '#475569' }}
+                    >
+                      {f}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           );
