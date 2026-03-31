@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Formula, Ingredient } from './types';
 import { DILUTION_MAP, IFRA_LIMITS } from './constants';
-import { Plus, Trash2, Save, Scale, Download, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Save, Scale, Download, ArrowUpDown, ChevronDown, } from 'lucide-react';
 
 interface Props {
   formula: Formula;
@@ -30,46 +30,32 @@ const FormulaEditor: React.FC<Props> = ({
     key: 'percentage',
     direction: 'desc'
   });
+  
+  // STATO PER LA VISTA (Lista Unica vs Piramide)
+  const [viewMode, setViewMode] = useState<'list' | 'pyramid'>('list');
 
   // --- 1. LOGICA DEI PESI (DEFINITIVA) ---
-  
-  // Peso Totale Lordo (La somma di tutto ciò che versi nel flacone)
-  // 1. Calcoliamo prima di tutto il peso lordo totale (quello che c'è nel flacone)
-const totalGrossWeight = useMemo(() => {
-  return formula.ingredients.reduce((acc, ing) => acc + (Number(ing.weightG) || 0), 0);
-}, [formula.ingredients]);
+  const totalGrossWeight = useMemo(() => {
+    return formula.ingredients.reduce((acc, ing) => acc + (Number(ing.weightG) || 0), 0);
+  }, [formula.ingredients]);
 
-// 2. Calcoliamo la lista degli ingredienti con le percentuali corrette
-const ingredientsWithPercentages = useMemo(() => {
-  return formula.ingredients.map(ing => {
-    const mat = materialsDB[ing.materialName];
-    const weight = Number(ing.weightG) || 0;
-    
-    // Controlliamo se è un solvente
-    const isSolvent = mat?.Type === "Solvente";
-    
-    // Se è solvente, non contribuisce al peso del concentrato (ratio 0)
-    const ratio = isSolvent ? 0 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
-    const pureWeight = weight * ratio;
+  const ingredientsWithPercentages = useMemo(() => {
+    return formula.ingredients.map(ing => {
+      const mat = materialsDB[ing.materialName];
+      const weight = Number(ing.weightG) || 0;
+      const isSolvent = mat?.Type === "Solvente";
+      const ratio = isSolvent ? 0 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
+      const pureWeight = weight * ratio;
+      const absolutePercentage = totalGrossWeight > 0 ? (pureWeight / totalGrossWeight) * 100 : 0;
 
-    // Percentuale sul totale lordo
-    const absolutePercentage = totalGrossWeight > 0 ? (pureWeight / totalGrossWeight) * 100 : 0;
+      return { ...ing, pureWeight, absolutePercentage, isSolvent };
+    });
+  }, [formula.ingredients, materialsDB, totalGrossWeight]);
 
-    return {
-      ...ing,
-      pureWeight,
-      absolutePercentage,
-      isSolvent
-    };
-  });
-}, [formula.ingredients, materialsDB, totalGrossWeight]); // <-- Aggiunto totalGrossWeight qui
+  const totalPureWeight = useMemo(() => {
+    return ingredientsWithPercentages.reduce((acc, ing) => acc + ing.pureWeight, 0);
+  }, [ingredientsWithPercentages]);
 
-// 3. Calcoliamo il peso puro totale (il concentrato vero e proprio)
-const totalPureWeight = useMemo(() => {
-  return ingredientsWithPercentages.reduce((acc, ing) => acc + ing.pureWeight, 0);
-}, [ingredientsWithPercentages]);
-
-  // Costo Totale (Basato sul peso puro)
   const totalCost = useMemo(() => {
     return formula.ingredients.reduce((acc, ing) => {
       const mat = materialsDB[ing.materialName];
@@ -78,43 +64,59 @@ const totalPureWeight = useMemo(() => {
     }, 0);
   }, [formula.ingredients, materialsDB]);
 
-  // --- 2. LOGICA ALLERGENI E IFRA GLOBALE (SOMMATORIA) ---
-// 1. Calcolo delle percentuali totali di ogni molecola nella formula
-const allergenTotals = useMemo(() => {
-  const totals: Record<string, number> = {};
-  formula.ingredients.forEach(ing => {
-    const mat = materialsDB[ing.materialName];
-    if (!mat || mat.Type === 'Solvente' || !mat.composition) return;
+  // --- LOGICA CALCOLO PERCENTUALI PER FASE (AGGIUNTA) ---
+  const getPhaseTotal = (phaseIngredients: Ingredient[]) => {
+    const sum = phaseIngredients.reduce((acc, ing) => {
+      const mat = materialsDB[ing.materialName];
+      if (mat?.Type === 'Solvente') return acc;
+      const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+      const pureWeight = (Number(ing.weightG) || 0) * ratio;
+      return acc + (totalGrossWeight > 0 ? (pureWeight / totalGrossWeight) * 100 : 0);
+    }, 0);
+    return sum.toFixed(2);
+  };
 
-    const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
-    const pureWeightG = (Number(ing.weightG) || 0) * ratio;
+  const getSolventTotal = (phaseIngredients: Ingredient[]) => {
+    const sum = phaseIngredients.reduce((acc, ing) => {
+      return acc + (totalGrossWeight > 0 ? (Number(ing.weightG) / totalGrossWeight) * 100 : 0);
+    }, 0);
+    return sum.toFixed(2);
+  };
 
-    Object.entries(mat.composition).forEach(([molecule, conc]) => {
-      const molName = molecule.toUpperCase().trim();
-      const moleculeGrams = (pureWeightG * (Number(conc) || 0)) / 100;
-      totals[molName] = (totals[molName] || 0) + moleculeGrams;
+  // --- 2. LOGICA ALLERGENI E IFRA GLOBALE ---
+  const allergenTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    formula.ingredients.forEach(ing => {
+      const mat = materialsDB[ing.materialName];
+      if (!mat || mat.Type === 'Solvente' || !mat.composition) return;
+
+      const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+      const pureWeightG = (Number(ing.weightG) || 0) * ratio;
+
+      Object.entries(mat.composition).forEach(([molecule, conc]) => {
+        const molName = molecule.toUpperCase().trim();
+        const moleculeGrams = (pureWeightG * (Number(conc) || 0)) / 100;
+        totals[molName] = (totals[molName] || 0) + moleculeGrams;
+      });
     });
-  });
 
-  const percentages: Record<string, number> = {};
-  Object.entries(totals).forEach(([mol, grams]) => {
-    percentages[mol] = totalGrossWeight > 0 ? (grams / totalGrossWeight) * 100 : 0;
-  });
-  return percentages;
-}, [formula.ingredients, materialsDB, totalGrossWeight]);
+    const percentages: Record<string, number> = {};
+    Object.entries(totals).forEach(([mol, grams]) => {
+      percentages[mol] = totalGrossWeight > 0 ? (grams / totalGrossWeight) * 100 : 0;
+    });
+    return percentages;
+  }, [formula.ingredients, materialsDB, totalGrossWeight]);
 
-// 2. Creazione della "Blacklist" (Molecole che hanno superato il limite)
-const violatedAllergens = useMemo(() => {
-  return Object.entries(allergenTotals)
-    .filter(([name, total]) => {
-      const limit = IFRA_LIMITS[name as keyof typeof IFRA_LIMITS];
-      return limit && total > limit; // Qui 2.592% > 1.9% -> CUMARINA entra in lista
-    })
-    .map(([name]) => name);
-}, [allergenTotals]);
+  const violatedAllergens = useMemo(() => {
+    return Object.entries(allergenTotals)
+      .filter(([name, total]) => {
+        const limit = IFRA_LIMITS[name as keyof typeof IFRA_LIMITS];
+        return limit && total > limit; 
+      })
+      .map(([name]) => name);
+  }, [allergenTotals]);
 
   // --- 3. ORDINAMENTO E GESTIONE INGREDIENTI ---
-
   const updateIngredient = (id: string, field: keyof Ingredient, value: string | number) => {
     const newIngredients = formula.ingredients.map(ing => 
       ing.id === id ? { ...ing, [field]: value } : ing
@@ -144,12 +146,153 @@ const violatedAllergens = useMemo(() => {
     return sorted;
   }, [formula.ingredients, sortConfig, totalGrossWeight]);
 
+  // --- 4. RAGGRUPPAMENTO PIRAMIDE ---
+  const groupedFormula = useMemo(() => {
+    const top: Ingredient[] = [];
+    const heart: Ingredient[] = [];
+    const base: Ingredient[] = [];
+    const solvents: Ingredient[] = [];
+
+    sortedIngredients.forEach(ing => {
+      const mat = materialsDB[ing.materialName] || {};
+      const isSolvent = mat.Type === 'Solvente';
+      
+      // Calcolo BP con fallback alle note testuali se BP numerico manca
+      const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 230 : 300);
+
+      if (isSolvent) {
+        solvents.push(ing);
+      } else if (bp < 200) {
+        top.push(ing);
+      } else if (bp >= 200 && bp <= 260) {
+        heart.push(ing);
+      } else {
+        base.push(ing);
+      }
+    });
+
+    return { top, heart, base, solvents };
+  }, [sortedIngredients, materialsDB]);
+
+  // --- 5. FUNZIONE DI RENDER DELLA SINGOLA RIGA ---
+  const renderRow = (ing: Ingredient) => {
+    const mat = materialsDB[ing.materialName];
+    const isSolvent = mat?.Type === 'Solvente';
+    const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+    const absolutePercentage = totalGrossWeight > 0 ? ((Number(ing.weightG) * ratio) / totalGrossWeight) * 100 : 0;
+    const weightG = Number(ing.weightG) || 0;
+    const pureWeight = weightG * ratio;
+
+    const containsViolatedAllergen = mat?.composition && Object.keys(mat.composition).some(molName => {
+      const cleanName = molName.toUpperCase().trim();
+      return violatedAllergens.includes(cleanName);
+    });
+
+    const directLimit = mat?.ifra ?? mat?.IFRA;
+    const isOverDirectLimit = directLimit && absolutePercentage > directLimit;
+    const isOverIfra = containsViolatedAllergen || isOverDirectLimit;
+
+    return (
+      <tr key={ing.id} className="hover:bg-blue-500/[0.02] group transition-colors border-b border-slate-900/50">
+        <td className="py-4 px-4 md:px-8">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={() => onViewMaterial(ing.materialName)}
+                className={`font-bold text-[13px] md:text-sm uppercase tracking-wide transition-colors text-left truncate ${isOverIfra ? 'text-red-500' : 'text-white hover:text-blue-400'}`}
+              >
+                {ing.materialName || "Senza nome"}
+              </button>
+              {isOverIfra && (
+                <span className="text-[8px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded font-black border border-red-500/20">
+                  {isOverDirectLimit ? 'LIMIT EXCEEDED' : 'ALLERGEN ALERT'}
+                </span>
+              )}
+            </div>
+            
+            {mat && !isSolvent && (
+              <details className="mt-1 group">
+                <summary className="list-none cursor-pointer flex items-center gap-1 text-[10px] font-black text-slate-500">
+                  IFRA {mat.ifra ?? mat.IFRA ?? 100}% <ChevronDown size={10} />
+                </summary>
+                <div className="pl-2 mt-1 border-l border-slate-800 space-y-1">
+                  {mat.composition && Object.entries(mat.composition).map(([name, value]) => {
+                    const isMoleculeViolated = violatedAllergens.includes(name.toUpperCase().trim());
+                    return (
+                      <div key={name} className="flex justify-between text-[9px] uppercase pr-4">
+                        <span className={isMoleculeViolated ? "text-red-400 font-bold" : "text-slate-400"}>
+                          {name}
+                        </span>
+                        <span className={isMoleculeViolated ? "text-red-500" : "text-slate-500"}>
+                          {String(value)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </div>
+        </td>
+
+        <td className="hidden md:table-cell py-4 px-4 text-center">
+          {isSolvent ? (
+            <span className="text-[10px] font-medium text-slate-800">—</span>
+          ) : (
+            <select 
+              className="bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
+              value={ing.dilution}
+              onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
+            >
+              {Object.keys(DILUTION_MAP).map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          )}
+        </td>
+
+        <td className="hidden md:table-cell py-4 px-4 text-center">
+          <input 
+            type="text" 
+            inputMode="decimal"
+            className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-white font-mono text-xs w-24 text-center outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+            value={ing.weightG}
+            onChange={(e) => {
+              const sanitizedValue = e.target.value.replace(',', '.');
+              if (/^\d*\.?\d*$/.test(sanitizedValue)) {
+                updateIngredient(ing.id, 'weightG', sanitizedValue);
+              }
+            }}
+            autoFocus={ing.weightG === '' || ing.weightG === 0 || ing.weightG === '0'}
+          />
+        </td>
+
+        <td className="py-4 px-4 text-center">
+          <div className={`text-[13px] font-mono font-black ${isOverIfra ? "text-red-500" : "text-blue-400"}`}>
+            {isSolvent ? '---' : `${absolutePercentage.toFixed(2)}%`}
+          </div>
+        </td>
+
+        <td className="hidden md:table-cell py-4 px-4 text-center font-mono text-[11px] text-emerald-500/80">
+          €{(pureWeight * (mat?.CostPerGram || 0)).toFixed(3)}
+        </td>
+
+        <td className="py-4 px-4 md:px-8 text-right">
+          <button onClick={() => removeIngredient(ing.id)} className="text-slate-700 hover:text-red-500 p-2">
+            <Trash2 size={18} />
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-slate-950/50 rounded-3xl border border-slate-800/50 overflow-hidden backdrop-blur-xl">
         {/* HEADER CONTROLLI */}
-        <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
+        <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+          <div className="flex-1">
             <input 
               className="bg-transparent text-2xl md:text-3xl font-black text-white outline-none placeholder:text-slate-800 w-full"
               value={formula.name}
@@ -162,6 +305,40 @@ const violatedAllergens = useMemo(() => {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
+            {/* SWITCHER VISTA ICONICO (GRAMMI / PIRAMIDE) */}
+            <div className="flex bg-slate-900/80 p-1 rounded-xl border border-slate-800 mr-2 shadow-inner">
+              <button 
+                onClick={() => setViewMode('list')} 
+                className={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1.5 ${
+                  viewMode === 'list' 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                  : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="Visualizzazione Lista (Grammi)"
+              >
+                <Scale size={14} strokeWidth={2.5} />
+                <span className="text-[10px] font-black uppercase tracking-tighter">g</span>
+              </button>
+              
+              <button 
+                onClick={() => setViewMode('pyramid')} 
+                className={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${
+                  viewMode === 'pyramid' 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+                  : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="Visualizzazione Fasi (Piramide)"
+              >
+                <div className="relative w-4 h-4 flex items-center justify-center">
+                  <div 
+                    className={`absolute inset-0 ${viewMode === 'pyramid' ? 'bg-white' : 'bg-slate-500 hover:bg-slate-300'}`} 
+                    style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%, 50% 0%, 50% 25%, 75% 90%, 25% 90%, 50% 25%)' }} 
+                  />
+                </div>
+              </button>
+            </div>
+
+            {/* PULSANTI AZIONE */}
             <button onClick={onOpenSelector} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-2xl text-xs font-black transition-all shadow-lg shadow-blue-600/20 uppercase tracking-widest">
               <Plus size={16} strokeWidth={3} /> Aggiungi
             </button>
@@ -189,139 +366,107 @@ const violatedAllergens = useMemo(() => {
                 </th>
                 <th className="hidden md:table-cell py-4 px-4 text-center">Diluizione</th>
                 <th className="hidden md:table-cell py-4 px-4 text-center">Peso (g)</th>
-                <th className="py-4 px-4 text-center">
-                   Assoluta (%)
-                </th>
+                <th className="py-4 px-4 text-center">Assoluta (%)</th>
                 <th className="hidden md:table-cell py-4 px-4 text-center">Costo</th>
                 <th className="py-4 px-4 md:px-8 text-right">Azioni</th>
               </tr>
             </thead>
-            <tbody>
-              {sortedIngredients.map((ing) => {
-  const mat = materialsDB[ing.materialName];
-  const isSolvent = mat?.Type === 'Solvente';
-  const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
-  const absolutePercentage = totalGrossWeight > 0 ? ((Number(ing.weightG) * ratio) / totalGrossWeight) * 100 : 0;
-  const weightG = Number(ing.weightG) || 0;
-  const pureWeight = weightG * ratio;
-// 2. CONTROLLO "MOLECOLE KILLER" (La parte che mancava alla Tonka)
-// Qui diciamo: "Caro materiale, non mi importa se tu come Fava Tonka sei sotto il tuo 4.6%. 
-// Se dentro di te hai una molecola che è nella Blacklist globale, devi diventare rosso!"
-const containsViolatedAllergen = mat?.composition && Object.keys(mat.composition).some(molName => {
-  const cleanName = molName.toUpperCase().trim();
-  // Se 'CUMARINA' è nella lista dei violati (perché somma Tonka + Aroma > 1.9)
-  return violatedAllergens.includes(cleanName);
-});
-
-// 3. CONTROLLO LIMITE DIRETTO (Il vecchio controllo che la faceva restare bianca)
-const directLimit = mat?.ifra ?? mat?.IFRA;
-const isOverDirectLimit = directLimit && absolutePercentage > directLimit;
-
-// STATO FINALE: Rosso se superi il tuo limite O se contieni una molecola "fuorilegge"
-const isOverIfra = containsViolatedAllergen || isOverDirectLimit;
-
-  return (
-    <tr key={ing.id} className="hover:bg-blue-500/[0.02] group transition-colors border-b border-slate-900/50">
-      <td className="py-4 px-4 md:px-8">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <button 
-              type="button"
-              onClick={() => onViewMaterial(ing.materialName)}
-              className={`font-bold text-[13px] md:text-sm uppercase tracking-wide transition-colors text-left truncate ${isOverIfra ? 'text-red-500' : 'text-white hover:text-blue-400'}`}
-            >
-              {ing.materialName || "Senza nome"}
-            </button>
-            {isOverIfra && (
-              <span className="text-[8px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded font-black border border-red-500/20">
-                {isOverDirectLimit ? 'LIMIT EXCEEDED' : 'ALLERGEN ALERT'}
-              </span>
-            )}
-          </div>
-          
-          {mat && !isSolvent && (
-            <details className="mt-1 group">
-              <summary className="list-none cursor-pointer flex items-center gap-1 text-[10px] font-black text-slate-500">
-                IFRA {mat.ifra ?? mat.IFRA ?? 100}% <ChevronDown size={10} />
-              </summary>
-              <div className="pl-2 mt-1 border-l border-slate-800 space-y-1">
-                {mat.composition && Object.entries(mat.composition).map(([name, value]) => {
-                  const isMoleculeViolated = violatedAllergens.includes(name.toUpperCase().trim());
-                  return (
-                    <div key={name} className="flex justify-between text-[9px] uppercase pr-4">
-                      <span className={isMoleculeViolated ? "text-red-400 font-bold" : "text-slate-400"}>
-                        {name}
-                      </span>
-                      <span className={isMoleculeViolated ? "text-red-500" : "text-slate-500"}>
-                        {String(value)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          )}
-        </div>
-      </td>
-
-      <td className="hidden md:table-cell py-4 px-4 text-center">
-  {isSolvent ? (
-    /* Nessun background, nessun bordo, solo un indicatore invisibile o nulla */
-    <span className="text-[10px] font-medium text-slate-800">
-      —
-    </span>
-  ) : (
-    <select 
-      className="bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
-      value={ing.dilution}
-      onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
-    >
-      {Object.keys(DILUTION_MAP).map(d => (
-        <option key={d} value={d}>{d}</option>
-      ))}
-    </select>
-  )}
-</td>
-
-      <td className="hidden md:table-cell py-4 px-4 text-center">
-        <input 
-          type="text" 
-          inputMode="decimal"
-          className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-white font-mono text-xs w-24 text-center outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-          value={ing.weightG}
-          onChange={(e) => {
-            // 1. IL SANITIZZATORE: Cambia istantaneamente la virgola in punto
-            const sanitizedValue = e.target.value.replace(',', '.');
             
-            // 2. IL FILTRO: Lascia passare solo numeri e un singolo punto (niente lettere o caratteri strani)
-            if (/^\d*\.?\d*$/.test(sanitizedValue)) {
-              updateIngredient(ing.id, 'weightG', sanitizedValue);
-            }
-          }}
-          // 3. IL FOCUS AUTOMATICO: Se il peso è vuoto o a zero (appena aggiunto), ci entra dentro da solo
-          autoFocus={ing.weightG === '' || ing.weightG === 0 || ing.weightG === '0'}
-        />
-      </td>
+            {/* CORPO DELLA TABELLA DINAMICO CON TITOLI SEZIONI UNIFORMI */}
+          <tbody>
+  {viewMode === 'list' ? (
+    sortedIngredients.map(renderRow)
+  ) : (
+    <>
+      {/* TOP NOTES */}
+      {groupedFormula.top.length > 0 && (
+        <>
+          <tr className="bg-slate-900 border-y border-slate-800/50">
+            <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-yellow-400">
+              <div className="flex items-center gap-3">
+                <div className="relative w-5 h-5 flex items-center justify-center">
+                  {/* Sfondo Grigio (Base e Centro) */}
+                  <div className="absolute inset-0 bg-slate-800" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }} />
+                  {/* Punta Gialla */}
+                  <div className="absolute inset-0 bg-yellow-400" style={{ clipPath: 'polygon(50% 0%, 33% 33%, 67% 33%)' }} />
+                </div>
+                <span className="text-[11px] font-black text-yellow-500 uppercase tracking-[0.2em]">
+                  Top Notes {getPhaseTotal(groupedFormula.top)}%
+                </span>
+              </div>
+            </td>
+          </tr>
+          {groupedFormula.top.map(renderRow)}
+        </>
+      )}
 
-      <td className="py-4 px-4 text-center">
-        <div className={`text-[13px] font-mono font-black ${isOverIfra ? "text-red-500" : "text-blue-400"}`}>
-          {isSolvent ? '---' : `${absolutePercentage.toFixed(2)}%`}
-        </div>
-      </td>
+      {/* HEART NOTES */}
+      {groupedFormula.heart.length > 0 && (
+        <>
+          <tr className="bg-slate-900 border-y border-slate-800/50">
+            <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-rose-500">
+              <div className="flex items-center gap-3">
+                <div className="relative w-5 h-5 flex items-center justify-center">
+                  {/* Sfondo Grigio (Punta e Base) */}
+                  <div className="absolute inset-0 bg-slate-800" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }} />
+                  {/* Centro Rosa */}
+                  <div className="absolute inset-0 bg-rose-500" style={{ clipPath: 'polygon(33% 33%, 67% 33%, 83% 66%, 17% 66%)' }} />
+                </div>
+                <span className="text-[11px] font-black text-rose-500 uppercase tracking-[0.2em]">
+                  Heart Notes {getPhaseTotal(groupedFormula.heart)}%
+                </span>
+              </div>
+            </td>
+          </tr>
+          {groupedFormula.heart.map(renderRow)}
+        </>
+      )}
 
-      <td className="hidden md:table-cell py-4 px-4 text-center font-mono text-[11px] text-emerald-500/80">
-        €{(pureWeight * (mat?.CostPerGram || 0)).toFixed(3)}
-      </td>
+      {/* BASE NOTES */}
+      {groupedFormula.base.length > 0 && (
+        <>
+          <tr className="bg-slate-900 border-y border-slate-800/50">
+            <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-indigo-600">
+              <div className="flex items-center gap-3">
+                <div className="relative w-5 h-5 flex items-center justify-center">
+                  {/* Sfondo Grigio (Punta e Centro) */}
+                  <div className="absolute inset-0 bg-slate-800" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)' }} />
+                  {/* Base Indaco */}
+                  <div className="absolute inset-0 bg-indigo-600" style={{ clipPath: 'polygon(17% 66%, 83% 66%, 100% 100%, 0% 100%)' }} />
+                </div>
+                <span className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em]">
+                  Base Notes {getPhaseTotal(groupedFormula.base)}%
+                </span>
+              </div>
+            </td>
+          </tr>
+          {groupedFormula.base.map(renderRow)}
+        </>
+      )}
 
-      <td className="py-4 px-4 md:px-8 text-right">
-        <button onClick={() => removeIngredient(ing.id)} className="text-slate-700 hover:text-red-500 p-2">
-          <Trash2 size={18} />
-        </button>
-      </td>
-    </tr>
-  );
-})}
-            </tbody>
+      {/* SOLVENTS */}
+      {groupedFormula.solvents.length > 0 && (
+        <>
+          <tr className="bg-slate-900 border-y border-slate-800/50">
+            <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-slate-600">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-slate-500">
+                    <path d="M10 2v7.5M14 2v7.5M8.5 2h7M7 21h10a2 2 0 0 0 2-2v-1.5c0-1.2-.8-2.3-2-2.7L14 13.5V9.5h-4v4l-3 1.3c-1.2.4-2 1.5-2 2.7V19a2 2 0 0 0 2 2z" />
+                  </svg>
+                </div>
+                <span className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                  Solventi & Diluenti {getSolventTotal(groupedFormula.solvents)}%
+                </span>
+              </div>
+            </td>
+          </tr>
+          {groupedFormula.solvents.map(renderRow)}
+        </>
+      )}
+    </>
+  )}
+</tbody>
           </table>
         </div>
 
@@ -360,12 +505,11 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
     const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
     const pureWeight = (Number(ing.weightG) || 0) * ratio;
     
-    // 1. BP e IMPACT (usiamo la moltiplicazione per valorizzare il 900 del Calone)
+    // 1. BP e IMPACT
     const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 260 : 350);
     const impact = parseFloat(mat.impact || mat.Impact || 10);
     
-    // 2. POTENZA LINEARE (Rimuoviamo il Log10 per non schiacciare le differenze)
-    // Ora Calone (0.2 * 900 = 180) vs Bergamotto (0.2 * 10 = 2)
+    // 2. POTENZA LINEARE
     const totalPower = pureWeight * impact;
 
     const vp = parseFloat(mat.VP) || 0.01; 
@@ -373,13 +517,10 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
 
     // 3. DISTRIBUZIONE DINAMICA BP
     if (bp < 200) {
-      // Testa pura (es. Bergamotto) - sparisce quasi del tutto dopo la testa
       pTesta = totalPower; pCuore = totalPower * 0.05; pFondo = 0;
     } else if (bp >= 200 && bp <= 260) {
-      // Cuore (es. Calone) - presente ovunque ma picco nel cuore
       pTesta = totalPower * 0.4; pCuore = totalPower; pFondo = totalPower * 0.6;
     } else {
-      // Fondo (es. Muschi) - cresce man mano
       pTesta = totalPower * 0.1; pCuore = totalPower * 0.4; pFondo = totalPower;
     }
 
