@@ -265,22 +265,23 @@ const isOverIfra = containsViolatedAllergen || isOverDirectLimit;
       </td>
 
       <td className="hidden md:table-cell py-4 px-4 text-center">
-        {isSolvent ? (
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter bg-slate-900/50 px-2 py-1 rounded border border-slate-800/50">
-            Solvente
-          </span>
-        ) : (
-          <select 
-            className="bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
-            value={ing.dilution}
-            onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
-          >
-            {Object.keys(DILUTION_MAP).map(d => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-        )}
-      </td>
+  {isSolvent ? (
+    /* Nessun background, nessun bordo, solo un indicatore invisibile o nulla */
+    <span className="text-[10px] font-medium text-slate-800">
+      —
+    </span>
+  ) : (
+    <select 
+      className="bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
+      value={ing.dilution}
+      onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
+    >
+      {Object.keys(DILUTION_MAP).map(d => (
+        <option key={d} value={d}>{d}</option>
+      ))}
+    </select>
+  )}
+</td>
 
       <td className="hidden md:table-cell py-4 px-4 text-center">
         <input 
