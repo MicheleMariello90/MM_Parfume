@@ -375,8 +375,7 @@ const MaterialModal = ({
                 placeholder="Scrivi qui..."
                 value={localDiary}
                 onChange={(e) => setLocalDiary(e.target.value)}
-                onBlur={() => isEditing && onUpdate('PersonalDiary', localDiary)}
-                readOnly={!isEditing}
+                onBlur={() => onUpdate('PersonalDiary', localDiary)}
               />
             </div>
             <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex justify-end">

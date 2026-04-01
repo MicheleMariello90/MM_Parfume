@@ -10,13 +10,18 @@ export const DILUTION_MAP: Record<string, number> = {
 
 // Limiti IFRA Cat. 4 (Profumeria) - Semplificati per il calcolo
 export const IFRA_LIMITS: Record<string, number> = {
+  "ALDEIDE CINNAMICA" : 0.25, 
+  "ALDEIDE CICLAMINO": 0.95,
+  "ALFA DAMASCONE": 0.060,
+  "BETA DAMASCONE": 0.043,
   "CUMARINA": 1.5,
   "CITRAL": 0.6,        // Limite accumulato di Citrale
   "EUGENOL": 2.5,       // Eugenolo
   "CINNAMAL": 0.25,     // Cinnamale
   "OAKMOSS": 0.1,       // Muschio di Quercia
   "GERANIOL": 5.3,      // Geraniolo
-  "BENZYL BENZOATE": 4.8  
+  "HEXYL CINNAMAL": 19,
+  "BENZYL BENZOATE": 4.8 
 };
 
 
