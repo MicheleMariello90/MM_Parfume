@@ -117,7 +117,7 @@ const MaterialModal = ({
       label="CAS" 
       value={data.cas || ''} 
       type="text" 
-      colorClass="text-yellow-300 font-mono" 
+      colorClass="text-yellow-300 font-mono text-[10px] tracking-tighter" 
       isReadOnly={!isEditing} 
       onSave={(val: any) => onUpdate('cas', val)} 
     />
@@ -125,14 +125,14 @@ const MaterialModal = ({
       label="BP (°C)" 
       value={data.BP || 0} 
       type="number" 
-      colorClass="text-blue-300" 
+      colorClass="text-blue-300 text-[11px]" 
       isReadOnly={!isEditing} 
       onSave={(val: any) => onUpdate('BP', val)} 
     />
     <EditableField 
       label="VP" 
       value={data.VP || ''} 
-      colorClass="text-purple-300" 
+      colorClass="text-purple-300 text-[11px]" 
       isReadOnly={!isEditing} 
       onSave={(val: any) => onUpdate('VP', val)} 
     />
@@ -141,7 +141,7 @@ const MaterialModal = ({
       label="IMPACT (↑)" 
       value={data.impact || 0} 
       type="number" 
-      colorClass="text-orange-400 font-black" 
+      colorClass="text-orange-400 font-black text-[11px]" 
       isReadOnly={!isEditing} 
       onSave={(val: any) => onUpdate('impact', Number(val))} 
     />
@@ -156,7 +156,7 @@ const MaterialModal = ({
                       label="Min %" 
                       value={data.MinUsage || 0} 
                       type="number" 
-                      colorClass="text-blue-400 text-base font-black" 
+                      colorClass="text-blue-400 text-xs font-black tracking-tighter" 
                       isReadOnly={!isEditing} 
                       onSave={(val: any) => onUpdate('MinUsage', val)} 
                     />
@@ -164,7 +164,7 @@ const MaterialModal = ({
                       label="Avg %" 
                       value={data.AvgUsage || 0} 
                       type="number" 
-                      colorClass="text-emerald-400 text-base font-black" 
+                      colorClass="text-emerald-400 text-xs font-black tracking-tighter" 
                       isReadOnly={!isEditing} 
                       onSave={(val: any) => onUpdate('AvgUsage', val)} 
                     />
@@ -172,7 +172,7 @@ const MaterialModal = ({
                       label="Max %" 
                       value={data.MaxUsage || 0} 
                       type="number" 
-                      colorClass="text-orange-400 text-base font-black" 
+                      colorClass="text-orange-400 text-xs font-black tracking-tighter" 
                       isReadOnly={!isEditing} 
                       onSave={(val: any) => onUpdate('MaxUsage', val)} 
                     />
@@ -180,7 +180,7 @@ const MaterialModal = ({
                       label="IFRA %" 
                       value={data.IFRA || 100} 
                       type="number" 
-                      colorClass="text-slate-400 text-base font-black" 
+                      colorClass="text-slate-400 text-xs font-black tracking-tighter" 
                       isReadOnly={!isEditing} 
                       onSave={(val: any) => onUpdate('IFRA', val)} 
                     />
@@ -249,7 +249,7 @@ const MaterialModal = ({
                                 newComp[e.target.value.toUpperCase()] = oldValue;
                                 onUpdate('composition', newComp);
                               }}
-                              className="flex-1 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[11px] font-bold text-slate-200 outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent uppercase"
+                              className="w-16 bg-slate-900 border border-slate-800 rounded-lg p-2 text-[10px] text-blue-400 font-mono text-center outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent tracking-tighter"
                             />
                             <div className="relative">
                               <input 
