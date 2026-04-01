@@ -241,7 +241,7 @@ const FormulaEditor: React.FC<Props> = ({
             <span className="text-[10px] font-medium text-slate-800">—</span>
           ) : (
             <select 
-              className="bg-slate-950 border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
+              className="bg-black border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
               value={ing.dilution}
               onChange={(e) => updateIngredient(ing.id, 'dilution', e.target.value)}
             >
@@ -256,7 +256,7 @@ const FormulaEditor: React.FC<Props> = ({
           <input 
             type="text" 
             inputMode="decimal"
-            className="bg-slate-950/50 border border-slate-900 rounded-xl py-2 px-3 text-white font-mono text-xs w-24 text-center outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+            className="bg-black/50 border border-slate-900 rounded-xl py-2 px-3 text-white font-mono text-xs w-24 text-center outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
             value={ing.weightG}
             onChange={(e) => {
               const sanitizedValue = e.target.value.replace(',', '.');
@@ -289,7 +289,7 @@ const FormulaEditor: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-950/50 rounded-3xl border border-slate-800/50 overflow-hidden backdrop-blur-xl">
+      <div className="bg-black/50 rounded-3xl border border-slate-800/50 overflow-hidden backdrop-blur-xl">
         {/* HEADER CONTROLLI */}
         <div className="p-6 md:p-8 border-b border-slate-800/50 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="flex-1">
@@ -306,7 +306,7 @@ const FormulaEditor: React.FC<Props> = ({
           
           <div className="flex flex-wrap items-center gap-3">
             {/* SWITCHER VISTA ICONICO (GRAMMI / PIRAMIDE) */}
-            <div className="flex bg-slate-900/80 p-1 rounded-xl border border-slate-800 mr-2 shadow-inner">
+            <div className="flex bg-black/80 p-1 rounded-xl border border-slate-800 mr-2 shadow-inner">
               <button 
                 onClick={() => setViewMode('list')} 
                 className={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1.5 ${
@@ -342,13 +342,13 @@ const FormulaEditor: React.FC<Props> = ({
             <button onClick={onOpenSelector} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-2xl text-xs font-black transition-all shadow-lg shadow-blue-600/20 uppercase tracking-widest">
               <Plus size={16} strokeWidth={3} /> Aggiungi
             </button>
-            <button onClick={() => onSave(formula)} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white rounded-2xl border border-slate-800 transition-all hover:bg-slate-800">
+            <button onClick={() => onSave(formula)} className="p-2.5 bg-black text-slate-400 hover:text-white rounded-2xl border border-slate-800 transition-all hover:bg-slate-800">
               <Save size={20} />
             </button>
-            <button onClick={onScale} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white rounded-2xl border border-slate-800 transition-all hover:bg-slate-800">
+            <button onClick={onScale} className="p-2.5 bg-black text-slate-400 hover:text-white rounded-2xl border border-slate-800 transition-all hover:bg-slate-800">
               <Scale size={20} />
             </button>
-            <button onClick={onExport} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white rounded-2xl border border-slate-800 transition-all hover:bg-slate-800">
+            <button onClick={onExport} className="p-2.5 bg-black text-slate-400 hover:text-white rounded-2xl border border-slate-800 transition-all hover:bg-slate-800">
               <Download size={20} />
             </button>
           </div>
@@ -381,7 +381,7 @@ const FormulaEditor: React.FC<Props> = ({
       {/* TOP NOTES */}
       {groupedFormula.top.length > 0 && (
         <>
-          <tr className="bg-slate-900 border-y border-slate-800/50">
+          <tr className="bg-black border-y border-slate-800/50">
             <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-yellow-400">
               <div className="flex items-center gap-3">
                 <div className="relative w-5 h-5 flex items-center justify-center">
@@ -403,7 +403,7 @@ const FormulaEditor: React.FC<Props> = ({
       {/* HEART NOTES */}
       {groupedFormula.heart.length > 0 && (
         <>
-          <tr className="bg-slate-900 border-y border-slate-800/50">
+          <tr className="bg-black border-y border-slate-800/50">
             <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-rose-500">
               <div className="flex items-center gap-3">
                 <div className="relative w-5 h-5 flex items-center justify-center">
@@ -425,7 +425,7 @@ const FormulaEditor: React.FC<Props> = ({
       {/* BASE NOTES */}
       {groupedFormula.base.length > 0 && (
         <>
-          <tr className="bg-slate-900 border-y border-slate-800/50">
+          <tr className="bg-black border-y border-slate-800/50">
             <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-indigo-600">
               <div className="flex items-center gap-3">
                 <div className="relative w-5 h-5 flex items-center justify-center">
@@ -447,7 +447,7 @@ const FormulaEditor: React.FC<Props> = ({
       {/* SOLVENTS */}
       {groupedFormula.solvents.length > 0 && (
         <>
-          <tr className="bg-slate-900 border-y border-slate-800/50">
+          <tr className="bg-black border-y border-slate-800/50">
             <td colSpan={6} className="py-3 px-4 md:px-8 border-l-4 border-slate-600">
               <div className="flex items-center gap-3">
                 <div className="w-5 h-5 flex items-center justify-center">
@@ -471,7 +471,7 @@ const FormulaEditor: React.FC<Props> = ({
         </div>
 
         {/* FOOTER TOTALI CORRETTO */}
-        <div className="p-8 bg-slate-900/50 flex justify-end items-center border-t border-slate-800/50">
+        <div className="p-8 bg-black/50 flex justify-end items-center border-t border-slate-800/50">
           <div className="flex gap-10 text-right">
             <div>
               <p className="text-[8px] text-slate-500 uppercase font-black mb-1">Peso Totale Lordo</p>
@@ -567,7 +567,7 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
                     {Math.round(item[powerKey]) > 0 ? Math.round(item[powerKey]) : '<1'}
                   </span>
                 </div>
-                <div className="h-1 w-full bg-slate-900 rounded-full overflow-hidden">
+                <div className="h-1 w-full bg-black rounded-full overflow-hidden">
                   <div 
                     className={`h-full ${color} transition-all duration-1000 shadow-[0_0_8px_rgba(0,0,0,0.4)]`}
                     style={{ width: `${(item[powerKey] / maxPower) * 100}%` }}
@@ -584,7 +584,7 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
   };
 
   return (
-    <div className="mt-12 p-8 bg-slate-950/50 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
+    <div className="mt-12 p-8 bg-black/50 rounded-[2.5rem] border border-slate-800/50 shadow-2xl">
       <div className="text-center mb-10">
         <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-blue-500 mb-2">
           Scientific Evolution Analysis
