@@ -39,6 +39,11 @@ const MaterialModal = ({
   const handleFinalRename = () => {
     const finalName = localName.toUpperCase().trim();
     if (!finalName || finalName === materialName) return;
+    
+    // 1. INVIA IL SALVATAGGIO A SUPABASE (La parte mancante!)
+    onUpdate('name', finalName);
+
+    // 2. AGGIORNA LO STATO LOCALE
     setMaterialsDB((prev: any) => {
       if (prev[finalName]) {
         alert("Questo nome esiste già!");
@@ -46,10 +51,12 @@ const MaterialModal = ({
         return prev;
       }
       const updatedDB = { ...prev };
-      updatedDB[finalName] = { ...updatedDB[materialName] };
-      delete updatedDB[materialName];
+      // Copia i dati sotto la nuova chiave e aggiorna anche la proprietà interna 'name'
+      updatedDB[finalName] = { ...updatedDB[materialName], name: finalName }; 
+      delete updatedDB[materialName]; // Elimina la vecchia chiave
       return updatedDB;
     });
+    
     setSelectedMaterialInfo(finalName);
   };
 
