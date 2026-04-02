@@ -11,6 +11,7 @@ export const DILUTION_MAP: Record<string, number> = {
 // Limiti IFRA Cat. 4 (Profumeria) - Semplificati per il calcolo
 export const IFRA_LIMITS: Record<string, number> = {
   "ALDEIDE CINNAMICA" : 0.25, 
+  "ALLYL AMYL GLYCOLATE": 1.25,
   "ALDEIDE CICLAMINO": 0.95,
   "ALFA DAMASCONE": 0.060,
   "BETA DAMASCONE": 0.043,

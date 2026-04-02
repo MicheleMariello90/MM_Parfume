@@ -307,11 +307,48 @@ const MaterialModal = ({
                   <div className="shrink-0 flex flex-row sm:flex-col items-center gap-4 sm:gap-0 mx-auto sm:mx-0">
                     <div className="w-16 h-16 sm:w-20 sm:h-20">
                        {/* SVG PIRAMIDE rimane uguale */}
-                       <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible">
-                        <path d="M24 65 L76 65 L90 95 L10 95 Z" onClick={() => isEditing && toggleVolatility("Fondo")} className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isBase ? 'fill-amber-600' : 'fill-slate-800/40'}`} />
-                        <path d="M37 35 L63 35 L76 65 L24 65 Z" onClick={() => isEditing && toggleVolatility("Cuore")} className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isHeart ? 'fill-emerald-500' : 'fill-slate-800/40'}`} />
-                        <path d="M50 5 L63 35 L37 35 Z" onClick={() => isEditing && toggleVolatility("Testa")} className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isTop ? 'fill-blue-500' : 'fill-slate-800/40'}`} />
-                      </svg>
+                       {/* --- PIRAMIDE --- */}
+<svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible">
+  {/* FONDO */}
+  <path 
+    d="M24 65 L76 65 L90 95 L10 95 Z" 
+    onClick={() => {
+      if (isEditing) {
+        toggleVolatility("Fondo"); // Aggiorna UI locale
+        // Calcola il nuovo valore di Volatility per Supabase
+        const newVol = isBase ? currentVolatility.replace("Fondo", "").trim() : (currentVolatility + " Fondo").trim();
+        onUpdate('Volatility', newVol);
+      }
+    }} 
+    className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isBase ? 'fill-amber-600' : 'fill-slate-800/40'}`} 
+  />
+
+  {/* CUORE */}
+  <path 
+    d="M37 35 L63 35 L76 65 L24 65 Z" 
+    onClick={() => {
+      if (isEditing) {
+        toggleVolatility("Cuore");
+        const newVol = isHeart ? currentVolatility.replace("Cuore", "").trim() : (currentVolatility + " Cuore").trim();
+        onUpdate('Volatility', newVol);
+      }
+    }} 
+    className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isHeart ? 'fill-emerald-500' : 'fill-slate-800/40'}`} 
+  />
+
+  {/* TESTA */}
+  <path 
+    d="M50 5 L63 35 L37 35 Z" 
+    onClick={() => {
+      if (isEditing) {
+        toggleVolatility("Testa");
+        const newVol = isTop ? currentVolatility.replace("Testa", "").trim() : (currentVolatility + " Testa").trim();
+        onUpdate('Volatility', newVol);
+      }
+    }} 
+    className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isTop ? 'fill-blue-500' : 'fill-slate-800/40'}`} 
+  />
+</svg>
                     </div>
                     <span className="text-[8px] font-black text-blue-400 uppercase bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 sm:mt-2">{data.Volatility || 'N/A'}</span>
                   </div>
