@@ -12,17 +12,36 @@ export const DILUTION_MAP: Record<string, number> = {
 export const IFRA_LIMITS: Record<string, number> = {
   "ALDEIDE CINNAMICA" : 0.25, 
   "ALLYL AMYL GLYCOLATE": 1.25,
+  "ALCOL CINNAMICO": 0.4,
   "ALDEIDE CICLAMINO": 0.95,
   "ALFA DAMASCONE": 0.060,
   "BETA DAMASCONE": 0.043,
+  "ALCOL BENZILICO": 0.58,
+  "BENZALDEIDE": 0.25,
+  "BENZYL BENZOATE": 4.8,
+  "BENZYL SALICYILATE": 15,
+  "BENZILE CINNAMMATO": 0.2,
   "CUMARINA": 1.5,
   "CITRAL": 0.6,        // Limite accumulato di Citrale
+  "CITRONELLOL": 13,
   "EUGENOL": 2.5,       // Eugenolo
+  "ESTRAGOLO": 0.42,
   "CINNAMAL": 0.25,     // Cinnamale
   "OAKMOSS": 0.1,       // Muschio di Quercia
+  "FARNESOL": 0.11,
   "GERANIOL": 5.3,      // Geraniolo
   "HEXYL CINNAMAL": 19,
-  "BENZYL BENZOATE": 4.8 
+  "HELIONAL": 5.3,
+  "HELIOTROPINA": 0.28,
+  "HEXALON": 0.2,
+  "GLYCOLIERRAL": 0.65,
+  "ISOEUGENOLO": 0.02,
+  "IONONE ALFA": 0.82,
+  "ISO E SUPER": 21.4,
+  "SAFRANAL": 0.005,
+  "PHENYLACETALDEIDE": 0.02,
+  "SALICILATO DI METILE": 0.5,
+  "METIL EUGENOLO": 0.016, 
 };
 
 
