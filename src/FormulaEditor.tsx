@@ -26,7 +26,7 @@ const FormulaEditor: React.FC<Props> = ({
   onOpenSelector,
   onViewMaterial
 }) => {
-  const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'percentage', direction: 'asc' | 'desc' }>({
+  const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'percentage' | 'VP', direction: 'asc' | 'desc' }>({
     key: 'percentage',
     direction: 'desc'
   });
@@ -131,20 +131,31 @@ const FormulaEditor: React.FC<Props> = ({
   const sortedIngredients = useMemo(() => {
     const sorted = [...formula.ingredients];
     sorted.sort((a, b) => {
+      const matA = materialsDB[a.materialName];
+      const matB = materialsDB[b.materialName];
+
       if (sortConfig.key === 'name') {
         return sortConfig.direction === 'asc' 
           ? a.materialName.localeCompare(b.materialName)
           : b.materialName.localeCompare(a.materialName);
-      } else {
-        const ratioA = DILUTION_MAP[a.dilution as keyof typeof DILUTION_MAP] || 1;
-        const ratioB = DILUTION_MAP[b.dilution as keyof typeof DILUTION_MAP] || 1;
-        const percA = totalGrossWeight > 0 ? ((Number(a.weightG) * ratioA) / totalGrossWeight) * 100 : 0;
-        const percB = totalGrossWeight > 0 ? ((Number(b.weightG) * ratioB) / totalGrossWeight) * 100 : 0;
-        return sortConfig.direction === 'asc' ? percA - percB : percB - percA;
       }
+      
+      if (sortConfig.key === 'VP') {
+        // Ordiniamo in base al valore VP nel database (default 0 se manca)
+        const valA = parseFloat(matA?.VP) || 0;
+        const valB = parseFloat(matB?.VP) || 0;
+        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+      }
+
+      // Default: ordinamento per percentuale assoluta
+      const ratioA = DILUTION_MAP[a.dilution as keyof typeof DILUTION_MAP] || 1;
+      const ratioB = DILUTION_MAP[b.dilution as keyof typeof DILUTION_MAP] || 1;
+      const percA = totalGrossWeight > 0 ? ((Number(a.weightG) * ratioA) / totalGrossWeight) * 100 : 0;
+      const percB = totalGrossWeight > 0 ? ((Number(b.weightG) * ratioB) / totalGrossWeight) * 100 : 0;
+      return sortConfig.direction === 'asc' ? percA - percB : percB - percA;
     });
     return sorted;
-  }, [formula.ingredients, sortConfig, totalGrossWeight]);
+  }, [formula.ingredients, sortConfig, materialsDB, totalGrossWeight]);
 
   // --- 4. RAGGRUPPAMENTO PIRAMIDE ---
   const groupedFormula = useMemo(() => {
@@ -174,14 +185,18 @@ const FormulaEditor: React.FC<Props> = ({
     return { top, heart, base, solvents };
   }, [sortedIngredients, materialsDB]);
 
-  // --- 5. FUNZIONE DI RENDER DELLA SINGOLA RIGA ---
+  // --- 5. FUNZIONE DI RENDER DELLA SINGOLA RIGA (COMPLETA DI TUTTO) ---
   const renderRow = (ing: Ingredient) => {
     const mat = materialsDB[ing.materialName];
     const isSolvent = mat?.Type === 'Solvente';
     const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
-    const absolutePercentage = totalGrossWeight > 0 ? ((Number(ing.weightG) * ratio) / totalGrossWeight) * 100 : 0;
     const weightG = Number(ing.weightG) || 0;
     const pureWeight = weightG * ratio;
+
+    // Percentuale: peso lordo per solventi, peso puro per aromatici
+    const absolutePercentage = totalGrossWeight > 0 
+      ? ((isSolvent ? weightG : pureWeight) / totalGrossWeight) * 100 
+      : 0;
 
     const containsViolatedAllergen = mat?.composition && Object.keys(mat.composition).some(molName => {
       const cleanName = molName.toUpperCase().trim();
@@ -211,34 +226,42 @@ const FormulaEditor: React.FC<Props> = ({
               )}
             </div>
             
-            {mat && !isSolvent && (
-              <details className="mt-1 group">
-                <summary className="list-none cursor-pointer flex items-center gap-1 text-[10px] font-black text-slate-500">
-                  IFRA {mat.ifra ?? mat.IFRA ?? 100}% <ChevronDown size={10} />
-                </summary>
-                <div className="pl-2 mt-1 border-l border-slate-800 space-y-1">
-                  {mat.composition && Object.entries(mat.composition).map(([name, value]) => {
-                    const isMoleculeViolated = violatedAllergens.includes(name.toUpperCase().trim());
-                    return (
-                      <div key={name} className="flex justify-between text-[9px] uppercase pr-4">
-                        <span className={isMoleculeViolated ? "text-red-400 font-bold" : "text-slate-400"}>
-                          {name}
-                        </span>
-                        <span className={isMoleculeViolated ? "text-red-500" : "text-slate-500"}>
-                          {String(value)}%
-                        </span>
+            {/* SOTTO-RIGA: VP E IFRA DROPDOWN */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                 {mat?.VP && (
+                   <span className="text-[9px] font-mono text-purple-400/70 font-bold">VP: {mat.VP}</span>
+                 )}
+                 {mat && !isSolvent && (
+                    <details className="group">
+                      <summary className="list-none cursor-pointer flex items-center gap-1 text-[9px] font-black text-slate-500 uppercase tracking-tighter">
+                        IFRA {mat.ifra ?? mat.IFRA ?? 100}% <ChevronDown size={10} className="group-open:rotate-180 transition-transform" />
+                      </summary>
+                      <div className="pl-2 mt-1 border-l border-slate-800 space-y-0.5 bg-black/20 rounded-r-lg p-1">
+                        {mat.composition && Object.entries(mat.composition).map(([name, value]) => {
+                          const isMoleculeViolated = violatedAllergens.includes(name.toUpperCase().trim());
+                          return (
+                            <div key={name} className="flex justify-between text-[8px] uppercase pr-2 gap-4">
+                              <span className={isMoleculeViolated ? "text-red-400 font-bold" : "text-slate-400"}>
+                                {name}
+                              </span>
+                              <span className={isMoleculeViolated ? "text-red-500 font-bold" : "text-slate-600"}>
+                                {String(value)}%
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              </details>
-            )}
+                    </details>
+                 )}
+              </div>
+            </div>
           </div>
         </td>
 
         <td className="hidden md:table-cell py-4 px-4 text-center">
           {isSolvent ? (
-            <span className="text-[10px] font-medium text-slate-800">—</span>
+            <span className="text-[10px]"></span>
           ) : (
             <select 
               className="bg-black border border-slate-800 rounded-lg text-[10px] font-bold py-1 px-2 text-slate-400 outline-none focus:border-blue-500 transition-colors"
@@ -269,17 +292,19 @@ const FormulaEditor: React.FC<Props> = ({
         </td>
 
         <td className="py-4 px-4 text-center">
-          <div className={`text-[13px] font-mono font-black ${isOverIfra ? "text-red-500" : isSolvent ? "text-slate-500" : "text-blue-400"}`}>
-            {absolutePercentage.toFixed(2)}%
+          <div className={`text-[13px] font-mono font-black ${
+            isOverIfra ? "text-red-500" : isSolvent ? "text-slate-500/60" : "text-blue-400"
+          }`}>
+            {absolutePercentage.toFixed(3)}%
           </div>
         </td>
 
-        <td className="hidden md:table-cell py-4 px-4 text-center font-mono text-[11px] text-emerald-500/80">
+        <td className="hidden md:table-cell py-4 px-4 text-center font-mono text-[11px] text-emerald-500/80 uppercase">
           €{(pureWeight * (mat?.CostPerGram || 0)).toFixed(3)}
         </td>
 
         <td className="py-4 px-4 md:px-8 text-right">
-          <button onClick={() => removeIngredient(ing.id)} className="text-slate-700 hover:text-red-500 p-2">
+          <button onClick={() => removeIngredient(ing.id)} className="text-slate-700 hover:text-red-500 p-2 transition-colors">
             <Trash2 size={18} />
           </button>
         </td>
@@ -305,36 +330,30 @@ const FormulaEditor: React.FC<Props> = ({
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            {/* SWITCHER VISTA ICONICO (GRAMMI / PIRAMIDE) */}
+            {/* SWITCHER VISTA E ORDINAMENTO */}
             <div className="flex bg-black/80 p-1 rounded-xl border border-slate-800 mr-2 shadow-inner">
               <button 
-                onClick={() => setViewMode('list')} 
-                className={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-1.5 ${
-                  viewMode === 'list' 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                  : 'text-slate-500 hover:text-slate-300'
-                }`}
-                title="Visualizzazione Lista (Grammi)"
+                onClick={() => { setViewMode('list'); setSortConfig({ key: 'percentage', direction: 'desc' }); }} 
+                className={`px-3 py-2 rounded-lg transition-all ${viewMode === 'list' && sortConfig.key === 'percentage' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                title="Ordina per Grammi / %"
               >
-                <Scale size={14} strokeWidth={2.5} />
-                <span className="text-[10px] font-black uppercase tracking-tighter">g</span>
+                <Scale size={14} />
+              </button>
+
+              <button 
+                onClick={() => { setViewMode('list'); setSortConfig({ key: 'VP', direction: 'desc' }); }} 
+                className={`px-3 py-2 rounded-lg transition-all ${sortConfig.key === 'VP' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                title="Ordina per Vapor Pressure (Decrescente)"
+              >
+                <span className="text-[10px] font-black uppercase tracking-tighter">VP</span>
               </button>
               
               <button 
                 onClick={() => setViewMode('pyramid')} 
-                className={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${
-                  viewMode === 'pyramid' 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
-                  : 'text-slate-500 hover:text-slate-300'
-                }`}
-                title="Visualizzazione Fasi (Piramide)"
+                className={`px-3 py-2 rounded-lg transition-all ${viewMode === 'pyramid' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                title="Vista Piramide"
               >
-                <div className="relative w-4 h-4 flex items-center justify-center">
-                  <div 
-                    className={`absolute inset-0 ${viewMode === 'pyramid' ? 'bg-white' : 'bg-slate-500 hover:bg-slate-300'}`} 
-                    style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%, 50% 0%, 50% 25%, 75% 90%, 25% 90%, 50% 25%)' }} 
-                  />
-                </div>
+                <div className="w-3.5 h-3.5" style={{ clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)', backgroundColor: 'currentColor' }} />
               </button>
             </div>
 
