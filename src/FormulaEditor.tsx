@@ -269,8 +269,8 @@ const FormulaEditor: React.FC<Props> = ({
         </td>
 
         <td className="py-4 px-4 text-center">
-          <div className={`text-[13px] font-mono font-black ${isOverIfra ? "text-red-500" : "text-blue-400"}`}>
-            {isSolvent ? '---' : `${absolutePercentage.toFixed(2)}%`}
+          <div className={`text-[13px] font-mono font-black ${isOverIfra ? "text-red-500" : isSolvent ? "text-slate-500" : "text-blue-400"}`}>
+            {absolutePercentage.toFixed(2)}%
           </div>
         </td>
 
