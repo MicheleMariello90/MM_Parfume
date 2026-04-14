@@ -40,10 +40,8 @@ const MaterialModal = ({
     const finalName = localName.toUpperCase().trim();
     if (!finalName || finalName === materialName) return;
     
-    // 1. INVIA IL SALVATAGGIO A SUPABASE (La parte mancante!)
     onUpdate('name', finalName);
 
-    // 2. AGGIORNA LO STATO LOCALE
     setMaterialsDB((prev: any) => {
       if (prev[finalName]) {
         alert("Questo nome esiste già!");
@@ -51,9 +49,8 @@ const MaterialModal = ({
         return prev;
       }
       const updatedDB = { ...prev };
-      // Copia i dati sotto la nuova chiave e aggiorna anche la proprietà interna 'name'
       updatedDB[finalName] = { ...updatedDB[materialName], name: finalName }; 
-      delete updatedDB[materialName]; // Elimina la vecchia chiave
+      delete updatedDB[materialName]; 
       return updatedDB;
     });
     
@@ -67,15 +64,12 @@ const MaterialModal = ({
 
   return (
     <>
-      {/* BACKGROUND: Ridotto il padding su mobile (p-2) */}
       <div className="fixed inset-0 z-[100] bg-[#020617]/95 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 text-slate-200">
         
-        {/* CONTAINER PRINCIPALE: Aggiunto flex-col e max-h-[92vh] */}
         <div className="bg-slate-900 border border-slate-800 w-full max-w-5xl rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden relative flex flex-col max-h-[92vh]">
           
-          {/* HEADER MODALE: Reso sticky per non perdere mai il tasto chiudi */}
           <div className="p-4 sm:p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md sticky top-0 z-20">
-            <div className="flex-1 min-w-0"> {/* min-w-0 evita che il testo rompa il layout */}
+            <div className="flex-1 min-w-0"> 
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 {!isEditing ? (
                   <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tighter truncate">{materialName}</h2>
@@ -113,91 +107,184 @@ const MaterialModal = ({
             </div>
           </div>
 
-          {/* CORPO SCROLLABILE: overflow-y-auto e altezza dinamica */}
           <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
               
-              {/* COLONNA SINISTRA: DATI TECNICI AGGIORNATI CON IMPACT LOGIC */}
-<div className="space-y-6">
-  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-    <EditableField 
-      label="CAS" 
-      value={data.cas || ''} 
-      type="text" 
-      colorClass="text-yellow-300 font-mono text-[10px] tracking-tighter" 
-      isReadOnly={!isEditing} 
-      onSave={(val: any) => onUpdate('cas', val)} 
-    />
-    <EditableField 
-      label="BP (°C)" 
-      value={data.BP || 0} 
-      type="number" 
-      colorClass="text-blue-300 text-[11px]" 
-      isReadOnly={!isEditing} 
-      onSave={(val: any) => onUpdate('BP', val)} 
-    />
-    <EditableField 
-      label="VP" 
-      value={data.VP || ''} 
-      colorClass="text-purple-300 text-[11px]" 
-      isReadOnly={!isEditing} 
-      onSave={(val: any) => onUpdate('VP', val)} 
-    />
-    {/* LOGICA INVERTITA: Ora Impact è a salire (↑) */}
-    <EditableField 
-      label="IMPACT (↑)" 
-      value={data.impact || 0} 
-      type="number" 
-      colorClass="text-orange-400 font-black text-[11px]" 
-      isReadOnly={!isEditing} 
-      onSave={(val: any) => onUpdate('impact', Number(val))} 
-    />
-  </div>
+              {/* COLONNA SINISTRA */}
+              <div className="space-y-6">
+                
+                {/* 1. GRIGLIA DATI TECNICI & LINK FORNITORE */}
+<div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+  <EditableField 
+    label="CAS" 
+    value={data.cas || ''} 
+    type="text" 
+    colorClass="text-yellow-300 font-mono text-[10px] tracking-tighter" 
+    isReadOnly={!isEditing} 
+    onSave={(val: any) => onUpdate('cas', val)} 
+  />
+  <EditableField 
+    label="BP (°C)" 
+    value={data.BP || 0} 
+    type="number" 
+    colorClass="text-blue-300 text-[11px] font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+    isReadOnly={!isEditing} 
+    onSave={(val: any) => onUpdate('BP', val)} 
+  />
+  <EditableField 
+    label="VP" 
+    value={data.VP || ''} 
+    colorClass="text-purple-300 text-[11px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+    isReadOnly={!isEditing} 
+    onSave={(val: any) => onUpdate('VP', val)} 
+  />
+  
+  <EditableField 
+    label="COSTO (€/g)" 
+    value={data.cost_per_gram || 0} 
+    type="number" 
+    colorClass="text-emerald-400 font-black text-[11px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+    isReadOnly={!isEditing} 
+    onSave={(val: any) => onUpdate('cost_per_gram', parseFloat(val))} 
+  />
 
-  <div className={`bg-slate-950/50 p-4 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'}`}>
-    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 border-b border-slate-800 pb-2 text-center">
-      Regulatory Limits
-    </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                    <EditableField 
-                      label="Min %" 
-                      value={data.MinUsage || 0} 
-                      type="number" 
-                      colorClass="text-blue-400 text-xs font-black tracking-tighter" 
-                      isReadOnly={!isEditing} 
-                      onSave={(val: any) => onUpdate('MinUsage', val)} 
-                    />
-                    <EditableField 
-                      label="Avg %" 
-                      value={data.AvgUsage || 0} 
-                      type="number" 
-                      colorClass="text-emerald-400 text-xs font-black tracking-tighter" 
-                      isReadOnly={!isEditing} 
-                      onSave={(val: any) => onUpdate('AvgUsage', val)} 
-                    />
-                    <EditableField 
-                      label="Max %" 
-                      value={data.MaxUsage || 0} 
-                      type="number" 
-                      colorClass="text-orange-400 text-xs font-black tracking-tighter" 
-                      isReadOnly={!isEditing} 
-                      onSave={(val: any) => onUpdate('MaxUsage', val)} 
-                    />
-                    <EditableField 
-                      label="IFRA %" 
-                      value={data.IFRA || 100} 
-                      type="number" 
-                      colorClass="text-slate-400 text-xs font-black tracking-tighter" 
-                      isReadOnly={!isEditing} 
-                      onSave={(val: any) => onUpdate('IFRA', val)} 
-                    />
+                  <div className={`sm:col-span-2 p-3 rounded-xl border transition-all flex flex-col justify-center overflow-hidden ${isEditing ? 'border-blue-500/30 bg-blue-500/5' : 'border-slate-800 bg-slate-900/50'}`}>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Link Fornitore</label>
+                    {isEditing ? (
+                      <input 
+                        type="text"
+                        placeholder="Es. https://perfumiarz.com/..."
+                        className="bg-transparent text-blue-400 text-[11px] outline-none border-b border-slate-700 focus:border-blue-500 pb-1 w-full"
+                        value={data.supplier_url || ''}
+                        onChange={(e) => onUpdate('supplier_url', e.target.value)}
+                      />
+                    ) : (
+                      data.supplier_url ? (
+                        <a 
+                          href={data.supplier_url.startsWith('http') ? data.supplier_url : `https://${data.supplier_url}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors group w-fit"
+                        >
+                          <span className="text-sm font-bold truncate max-w-[180px]">
+                            {(() => {
+                              try {
+                                return new URL(data.supplier_url.startsWith('http') ? data.supplier_url : `https://${data.supplier_url}`).hostname.replace('www.', '');
+                              } catch {
+                                return "Apri Link";
+                              }
+                            })()}
+                          </span>
+                          <svg className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="14" height="14">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      ) : (
+                        <span className="text-[11px] text-slate-600 italic">Nessun link inserito</span>
+                      )
+                    )}
                   </div>
                 </div>
 
-                {/* --- SEZIONE TYPE E COMPOSIZIONE ALLERGENI --- */}
+                {/* BARRA IMPACT ACCATTIVANTE - NO SPINNER & FONT PULITO */}
+  <div className={`p-4 rounded-[1.5rem] border transition-all ${isEditing ? 'border-sky-500/20 bg-sky-500/5' : 'border-slate-800 bg-slate-950/40'}`}>
+    <div className="flex justify-between items-end mb-3">
+      <div>
+        <label className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-1">Potenza Olfattiva</label>
+        <span className={`text-[10px] font-black uppercase tracking-tighter transition-colors duration-300 ${
+          (data.impact || 0) <= 3 ? 'text-white-400' : 
+          (data.impact || 0) <= 6 ? 'text-white-400' : 
+          (data.impact || 0) <= 9 ? 'text-white-500' :
+          (data.impact || 0) <= 50? 'text-white-500' : 'text-red-500 animate-pulse'
+        }`}>
+          {(data.impact || 0) <= 3 ? 'Debole' : 
+           (data.impact || 0) <= 6 ? 'Normale' : 
+           (data.impact || 0) <= 9 ? 'Forte' : 
+           (data.impact || 0) <= 50 ? 'Forte' : 'Enorme'}
+        </span>
+      </div>
+      
+      <div className="flex items-baseline gap-1">
+        {isEditing ? (
+          <input 
+            type="number"
+            min="0"
+            max="20"
+            /* Rimuove lo 0 iniziale quando vuoi digitare */
+            value={data.impact === 0 ? '' : data.impact}
+            onChange={(e) => {
+              const val = e.target.value === '' ? 0 : Number(e.target.value);
+              onUpdate('impact', val);
+            }}
+            /* Classi per eliminare lo spinner: [appearance:textfield] e i selettori webkit */
+            className="bg-transparent text-white font-sans text-2xl w-12 outline-none text-right border-b border-slate-700 focus:border-sky-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            placeholder="-"
+          />
+        ) : (
+          <span className="text-white font-sans text-2xl">{(data.impact || 0)}</span>
+        )}
+        <span className="text-slate-600 text-[9px] font-black uppercase tracking-widest ml-1"></span>
+      </div>
+    </div>
+
+    {/* Barra con Gradiente Sfumato */}
+    <div className="relative h-2 w-full bg-slate-800/40 rounded-full overflow-hidden">
+      <div 
+        className="absolute inset-0 h-full rounded-full transition-all duration-300 ease-out"
+        style={{ 
+          width: `${Math.min(100, (data.impact || 0) * 10)}%`,
+          background: 'linear-gradient(90deg, #38bdf8 0%, #facc15 35%, #f97316 70%, #ef4444 100%)',
+          boxShadow: (data.impact || 0) > 0 ? `0 0 15px ${(data.impact || 0) <= 3 ? '#38bdf840' : (data.impact || 0) <= 6 ? '#facc1540' : (data.impact || 0) <= 9 ? '#f9731640' : '#ef444450'}` : 'none'
+        }}
+      >
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
+      </div>
+    </div>
+  </div>
+
+                {/* 3. REGULATORY LIMITS */}
+<div className={`bg-slate-950/50 p-4 rounded-[1.5rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'}`}>
+  <h4 className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] mb-4 border-b border-slate-800/50 pb-2 text-center">
+    Regulatory Limits
+  </h4>
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+    <EditableField 
+      label="Min %" 
+      value={data.MinUsage || 0} 
+      type="number" 
+      colorClass="text-blue-400 text-[11px] font-bold tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('MinUsage', val)} 
+    />
+    <EditableField 
+      label="Avg %" 
+      value={data.AvgUsage || 0} 
+      type="number" 
+      colorClass="text-emerald-400 text-[11px] font-bold tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('AvgUsage', val)} 
+    />
+    <EditableField 
+      label="Max %" 
+      value={data.MaxUsage || 0} 
+      type="number" 
+      colorClass="text-orange-400 text-[11px] font-bold tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('MaxUsage', val)} 
+    />
+    <EditableField 
+      label="IFRA %" 
+      value={data.IFRA || 100} 
+      type="number" 
+      colorClass="text-slate-400 text-[11px] font-bold tracking-tight [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+      isReadOnly={!isEditing} 
+      onSave={(val: any) => onUpdate('IFRA', val)} 
+    />
+  </div>
+</div>
+                {/* 4. NATURA DELLA MATERIA E ALLERGENI */}
                 <div className={`mt-6 p-4 sm:p-6 rounded-[1.5rem] border transition-all ${isEditing ? 'border-blue-500/30 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.1)]' : 'border-slate-800 bg-slate-950/50'}`}>
                   
-                  {/* SELETTORE TIPO MATERIA */}
                   <div className="mb-6">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3 block">
                       Natura della Materia
@@ -222,7 +309,6 @@ const MaterialModal = ({
                     )}
                   </div>
 
-                  {/* SEZIONE COMPOSIZIONE (Visualizzata solo se NON è un solvente) */}
                   {data.type !== 'Solvente' && (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center border-b border-slate-800 pb-2">
@@ -306,49 +392,42 @@ const MaterialModal = ({
                 <div className={`bg-slate-950/30 rounded-[1.5rem] sm:rounded-[2.5rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'} p-4 sm:p-8 flex flex-col sm:flex-row gap-6 items-start`}>
                   <div className="shrink-0 flex flex-row sm:flex-col items-center gap-4 sm:gap-0 mx-auto sm:mx-0">
                     <div className="w-16 h-16 sm:w-20 sm:h-20">
-                       {/* SVG PIRAMIDE rimane uguale */}
-                       {/* --- PIRAMIDE --- */}
-<svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible">
-  {/* FONDO */}
-  <path 
-    d="M24 65 L76 65 L90 95 L10 95 Z" 
-    onClick={() => {
-      if (isEditing) {
-        toggleVolatility("Fondo"); // Aggiorna UI locale
-        // Calcola il nuovo valore di Volatility per Supabase
-        const newVol = isBase ? currentVolatility.replace("Fondo", "").trim() : (currentVolatility + " Fondo").trim();
-        onUpdate('Volatility', newVol);
-      }
-    }} 
-    className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isBase ? 'fill-amber-600' : 'fill-slate-800/40'}`} 
-  />
-
-  {/* CUORE */}
-  <path 
-    d="M37 35 L63 35 L76 65 L24 65 Z" 
-    onClick={() => {
-      if (isEditing) {
-        toggleVolatility("Cuore");
-        const newVol = isHeart ? currentVolatility.replace("Cuore", "").trim() : (currentVolatility + " Cuore").trim();
-        onUpdate('Volatility', newVol);
-      }
-    }} 
-    className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isHeart ? 'fill-emerald-500' : 'fill-slate-800/40'}`} 
-  />
-
-  {/* TESTA */}
-  <path 
-    d="M50 5 L63 35 L37 35 Z" 
-    onClick={() => {
-      if (isEditing) {
-        toggleVolatility("Testa");
-        const newVol = isTop ? currentVolatility.replace("Testa", "").trim() : (currentVolatility + " Testa").trim();
-        onUpdate('Volatility', newVol);
-      }
-    }} 
-    className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isTop ? 'fill-blue-500' : 'fill-slate-800/40'}`} 
-  />
-</svg>
+                      {/* --- PIRAMIDE SVG --- */}
+                      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg overflow-visible">
+                        <path 
+                          d="M24 65 L76 65 L90 95 L10 95 Z" 
+                          onClick={() => {
+                            if (isEditing) {
+                              toggleVolatility("Fondo");
+                              const newVol = isBase ? currentVolatility.replace("Fondo", "").trim() : (currentVolatility + " Fondo").trim();
+                              onUpdate('Volatility', newVol);
+                            }
+                          }} 
+                          className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isBase ? 'fill-amber-600' : 'fill-slate-800/40'}`} 
+                        />
+                        <path 
+                          d="M37 35 L63 35 L76 65 L24 65 Z" 
+                          onClick={() => {
+                            if (isEditing) {
+                              toggleVolatility("Cuore");
+                              const newVol = isHeart ? currentVolatility.replace("Cuore", "").trim() : (currentVolatility + " Cuore").trim();
+                              onUpdate('Volatility', newVol);
+                            }
+                          }} 
+                          className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isHeart ? 'fill-emerald-500' : 'fill-slate-800/40'}`} 
+                        />
+                        <path 
+                          d="M50 5 L63 35 L37 35 Z" 
+                          onClick={() => {
+                            if (isEditing) {
+                              toggleVolatility("Testa");
+                              const newVol = isTop ? currentVolatility.replace("Testa", "").trim() : (currentVolatility + " Testa").trim();
+                              onUpdate('Volatility', newVol);
+                            }
+                          }} 
+                          className={`transition-all duration-300 ${isEditing ? 'cursor-pointer hover:opacity-80' : 'cursor-default'} ${isTop ? 'fill-blue-500' : 'fill-slate-800/40'}`} 
+                        />
+                      </svg>
                     </div>
                     <span className="text-[8px] font-black text-blue-400 uppercase bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 sm:mt-2">{data.Volatility || 'N/A'}</span>
                   </div>
@@ -400,7 +479,7 @@ const MaterialModal = ({
         </div>
       </div>
 
-      {/* OVERLAY DIARIO: Anche qui aggiunto max-h e flex-col */}
+      {/* OVERLAY DIARIO */}
       {showPersonalNotes && (
         <div className="fixed inset-0 z-[300] bg-[#020617]/95 backdrop-blur-xl flex items-center justify-center p-2">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -431,7 +510,7 @@ const MaterialModal = ({
         </div>
       )}
       
-      {/* OVERLAY SELEZIONE FAMIGLIE: Ottimizzato per il tocco */}
+      {/* OVERLAY SELEZIONE FAMIGLIE */}
       {showFamilyGrid && isEditing && (
         <div className="fixed inset-0 z-[400] bg-[#020617]/98 backdrop-blur-2xl p-4 flex flex-col">
            <div className="flex justify-between items-center mb-6">
