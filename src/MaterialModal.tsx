@@ -330,50 +330,54 @@ const MaterialModal = ({
 
                       <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
                         {Object.entries(data.composition || {}).map(([name, value], idx) => (
-                          <div key={idx} className="flex gap-2 items-center animate-in fade-in slide-in-from-left-2 duration-200">
-                            <input 
-                              disabled={!isEditing}
-                              placeholder="Es. Linalool"
-                              value={name}
-                              onChange={(e) => {
-                                const newComp = { ...data.composition };
-                                const oldValue = newComp[name];
-                                delete newComp[name];
-                                newComp[e.target.value.toUpperCase()] = oldValue;
-                                onUpdate('composition', newComp);
-                              }}
-                              className="w-16 bg-slate-900 border border-slate-800 rounded-lg p-2 text-[10px] text-blue-400 font-mono text-center outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent tracking-tighter"
-                            />
-                            <div className="relative">
-                              <input 
-                                disabled={!isEditing}
-                                type="number"
-                                placeholder="0"
-                                value={value as number}
-                                onChange={(e) => {
-                                  const newComp = { ...data.composition };
-                                  newComp[name] = Number(e.target.value);
-                                  onUpdate('composition', newComp);
-                                }}
-                                className="w-20 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[11px] text-blue-400 font-mono text-center outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent"
-                              />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 font-bold">%</span>
-                            </div>
-                            {isEditing && (
-                              <button 
-                                onClick={() => {
-                                  const newComp = { ...data.composition };
-                                  delete newComp[name];
-                                  onUpdate('composition', newComp);
-                                }}
-                                className="p-2 text-slate-600 hover:text-red-500 transition-colors"
-                              >
-                                <X size={14} />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                        
+  <div key={idx} className="flex gap-4 items-center justify-between animate-in fade-in slide-in-from-left-2 duration-200 p-1">
+    {/* NOME MOLECOLA: flex-1 lo fa allungare al massimo */}
+    <input 
+      disabled={!isEditing}
+      placeholder="Es. Linalool"
+      value={name}
+      onChange={(e) => {
+        const newComp = { ...data.composition };
+        const oldValue = newComp[name];
+        delete newComp[name];
+        newComp[e.target.value.toUpperCase()] = oldValue;
+        onUpdate('composition', newComp);
+      }}
+      className="flex-1 bg-slate-900/50 border border-slate-800 rounded-lg p-2 text-[11px] text-blue-400 font-bold outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent tracking-wide"
+    />
+
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <input 
+          disabled={!isEditing}
+          type="number"
+          placeholder="0"
+          value={value as number}
+          onChange={(e) => {
+            const newComp = { ...data.composition };
+            newComp[name] = Number(e.target.value);
+            onUpdate('composition', newComp);
+          }}
+          className="w-20 bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-[11px] text-blue-400 font-mono text-center outline-none focus:border-blue-500/50 disabled:bg-transparent disabled:border-transparent"
+        />
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-600 font-bold">%</span>
+      </div>
+
+      {isEditing && (
+        <button 
+          onClick={() => {
+            const newComp = { ...data.composition };
+            delete newComp[name];
+            onUpdate('composition', newComp);
+          }}
+          className="p-2 text-slate-600 hover:text-red-500 transition-colors"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  </div>
+))}                 
                         {(!data.composition || Object.keys(data.composition).length === 0) && (
                           <div className="py-4 text-center border-2 border-dashed border-slate-800/50 rounded-2xl">
                             <p className="text-[10px] text-slate-600 italic uppercase font-medium tracking-widest">
