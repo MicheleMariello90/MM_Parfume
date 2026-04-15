@@ -3,12 +3,13 @@ import { supabase } from './supabaseClient';
 import FormulaEditor from './FormulaEditor';
 import { Formula, Ingredient } from './types';
 import { FAMILY_COLORS, DILUTION_MAP } from './constants';
-import { Book, Search, Activity, AlertTriangle, X, Plus, Menu, Droplets, FlaskConical } from 'lucide-react';
+import { Book, Search, AlertTriangle, X, Plus, Menu, Droplets, FlaskConical, LogOut } from 'lucide-react';
 import './index.css';
 
 import MaterialModal from './MaterialModal';
 import FormulaArchive from './FormulaArchive';
 import MaterialLibrary from './MaterialLibrary';
+import { Auth } from './Auth';
 
 type Section = 'editor' | 'library' | 'history' | 'settings';
 
@@ -73,13 +74,13 @@ const EditableField = ({ label, value, onSave, isReadOnly, type = "text", step =
 
 function App() {
   // --- 1. ZONA STATI ---
+  const [session, setSession] = useState<any>(null);
   const [activeSection, setActiveSection] = useState<Section>('editor');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectorSearch, setSelectorSearch] = useState('');
   const [selectedMaterialInfo, setSelectedMaterialInfo] = useState<string | null>(null);
   const [selectorView, setSelectorView] = useState<'materials' | 'accords'>('materials');
-  const [isAiLoading, setIsAiLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true); // Stato di caricamento Cloud
@@ -272,7 +273,20 @@ const deleteFromHistory = async (id: string, e: React.MouseEvent) => {
   }
 };
 
-  useEffect(() => { fetchCloudData(); }, [fetchCloudData]);
+  useEffect(() => { 
+  if (session) {
+    fetchCloudData(); 
+  }
+}, [fetchCloudData, session]);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // --- 3. FUNZIONI DI AGGIORNAMENTO MATERIALI (CLOUD) ---
 
@@ -560,90 +574,6 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
       setActiveSection('editor');
     }
   }, []);
-  // --- 7. LOGICA IA GEMINI (USANDO IL DB REATTIVO) ---
-  const handleAIQuery = async (queryText: string): Promise<boolean> => {
-    if (!queryText || !queryText.trim()) return false;
-    
-    /* // VECCHIA LOGICA DISATTIVATA PER SICUREZZA
-    const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-    if (!apiKey){
-      alert("Manca la API Key nel file .env");
-      return false;
-    }
-    */
-
-    setIsAiLoading(true);
-
-    try {
-      const availableMaterials = Object.keys(materialsDB).join(", ");
-      
-      const prompt = `Sei un Master Perfumer. Crea un accordo di profumeria basato su: "${queryText}".
-      Usa SOLO questi materiali: [${availableMaterials}].
-      Rispondi esclusivamente con un array JSON puro, senza markdown e senza testo prima o dopo.
-      Esempio: [{"materialName": "ISO E SUPER", "weightG": 5.0, "dilution": "100%"}]`;
-
-      const response = await fetch('/api/gemini', { // NIENTE .js finale
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    contents: [{
-      parts: [{ text: prompt }]
-    }]
-  })
-});
-
-const data = await response.json();
-
-// 1. Log fondamentale per il debug: guarda la console di Chrome (F12)
-console.log("Risposta completa dal server:", data);
-
-if (!response.ok) {
-  throw new Error(data.error?.message || "Errore del server");
-}
-
-// 2. Estrazione sicura con il punto di domanda (?.)
-const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-if (!aiText) {
-  // Se arriviamo qui, Gemini ha risposto ma non c'è testo (es. bloccato dai filtri)
-  console.error("Struttura dati non valida:", data);
-  throw new Error("L'IA non ha restituito una risposta valida. Controlla la console.");
-}
-      const jsonMatch = aiText.match(/\[.*\]/s);
-
-      if (jsonMatch) {
-        const rawIngredients = JSON.parse(jsonMatch[0]);
-        const newIngredients = rawIngredients.map((item: any) => {
-          const info = materialsDB[item.materialName] || {};
-          return {
-            id: Math.random().toString(36).substring(2, 9),
-            materialName: item.materialName,
-            weightG: String(item.weightG),
-            dilution: item.dilution || "100%",
-            notes: info.Notes || "N/A",
-            ...info
-          };
-        });
-
-        setFormula((prev: any) => ({
-          ...prev, id: Date.now().toString(), name: queryText.toUpperCase(), ingredients: newIngredients
-        }));
-
-        console.log("✅ Formula creata con successo!");
-        return true;
-      }
-      return false;
-    } catch (err: any) {
-      console.error("Errore:", err);
-      alert("Errore IA: " + err.message);
-      return false;
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
   // --- 8. LOGICA DI CALCOLO AGGIORNATA (ODT-BASED) ---
 const { analysis, alerts } = useMemo(() => {
   const familyTotals: Record<string, number> = {};
@@ -729,7 +659,10 @@ const { analysis, alerts } = useMemo(() => {
 };
 
   // --- SCHERMATA DI CARICAMENTO CON LOGO ---
-
+  // SE NON SEI LOGGATO MOSTRA IL LOGIN
+  if (!session) {
+    return <Auth />;
+  }
 if (isLoading) {
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-12 p-10">
@@ -851,82 +784,90 @@ if (isLoading) {
 `}>
   
   {/* LOGO AZIENDALE */}
-  <div className="flex flex-col items-center w-full px-6 mb-12">
-    <img 
-      src="/logo.png" 
-      className="w-32 h-32 object-contain cursor-pointer hover:scale-105 transition-transform" 
-      onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
-      alt="Logo Aura Lab"
-    />
-  </div>
-
-  <div className="flex-1 w-full flex flex-col justify-between overflow-hidden">
-    
-    {/* NAVIGAZIONE */}
-    <nav className="w-full px-4 space-y-1">
-      <button 
-        onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
-        className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
-          activeSection === 'editor' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        <FlaskConical size={16} className={activeSection === 'editor' ? 'text-blue-400' : 'text-slate-500'} />
-        <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Laboratorio</span>
-      </button>
-
-      <button 
-        onClick={() => { setActiveSection('library'); setIsMenuOpen(false); }}
-        className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
-          activeSection === 'library' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        <Droplets size={16} className={activeSection === 'library' ? 'text-blue-400' : 'text-slate-500'} />
-        <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Materie Prime</span>
-      </button>
-
-      <button 
-        onClick={() => { setActiveSection('history'); setIsMenuOpen(false); }}
-        className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
-          activeSection === 'history' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
-        }`}
-      >
-        <Search size={16} className={activeSection === 'history' ? 'text-blue-400' : 'text-slate-500'} />
-        <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Archivio Formule</span>
-      </button>
-    </nav>
-
-    {/* PROFILES - SOLO > 20% CON TESTO DINAMICO */}
-    <div className="mb-10 px-6">
-      <div className="flex flex-col gap-1.5">
-        {analysis
-          .filter(fam => fam.percentage >= 20) // Filtro aumentato al 20%
-          .map((fam) => {
-            // Logica Colore Testo: Nero per Vanigliato e famiglie chiare
-            const lightFamilies = ["AGRUMATO", "CREMOSO", "FRESCO", "SALATO", "VANIGLIATO", "TALCATO", "MUSCHIATO", "LATTONICO", "MIELATO", "OZONICO", "FLOREALE BIANCO", "GOURMAND"];
-            const isLightColor = lightFamilies.includes(fam.name.toUpperCase());
-            
-            return (
-              <div key={fam.name} className="relative w-full h-[18px]">
-                <div 
-                  className="h-full transition-all duration-1000 ease-out flex items-center px-2.5 rounded-[2px]" 
-                  style={{ 
-                    width: `${fam.percentage}%`, 
-                    backgroundColor: FAMILY_COLORS[fam.name as keyof typeof FAMILY_COLORS] || "#444" 
-                  }}
-                >
-                  <span className={`text-[9px] font-semibold lowercase tracking-tight truncate ${
-                    isLightColor ? 'text-black' : 'text-white'
-                  }`}>
-                    {fam.name}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-      </div>
+    <div className="flex flex-col items-center w-full px-6 mb-12">
+      <img 
+        src="/logo.png" 
+        className="w-32 h-32 object-contain cursor-pointer hover:scale-105 transition-transform" 
+        onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); setSearchTerm(''); }}
+        alt="Logo Aura Lab"
+      />
     </div>
 
-  </div>
+    <div className="flex-1 w-full flex flex-col justify-between overflow-hidden">
+      
+      {/* NAVIGAZIONE */}
+      <nav className="w-full px-4 space-y-1">
+        <button 
+          onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); setSearchTerm(''); }}
+          className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
+            activeSection === 'editor' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <FlaskConical size={16} className={activeSection === 'editor' ? 'text-blue-400' : 'text-slate-500'} />
+          <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Laboratorio</span>
+        </button>
+
+        <button 
+          onClick={() => { setActiveSection('library'); setIsMenuOpen(false); setSearchTerm(''); }}
+          className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
+            activeSection === 'library' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <Droplets size={16} className={activeSection === 'library' ? 'text-blue-400' : 'text-slate-500'} />
+          <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Materie Prime</span>
+        </button>
+
+        <button 
+          onClick={() => { setActiveSection('history'); setIsMenuOpen(false); setSearchTerm(''); }}
+          className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
+            activeSection === 'history' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <Search size={16} className={activeSection === 'history' ? 'text-blue-400' : 'text-slate-500'} />
+          <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Archivio Formule</span>
+        </button>
+
+        {/* TASTO LOGOUT */}
+        <button 
+          onClick={() => supabase.auth.signOut()}
+          className="w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all text-slate-500 hover:text-red-400 hover:bg-red-500/5 group"
+        >
+          <LogOut size={16} className="text-slate-500 group-hover:text-red-400 transition-colors" />
+          <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Logout</span>
+        </button>
+      </nav>
+
+      {/* PROFILES - ANALISI PIRAMIDE */}
+      <div className="mb-10 px-6">
+        <div className="flex flex-col gap-1.5">
+          {analysis
+            .filter(fam => fam.percentage >= 20)
+            .map((fam) => {
+              const lightFamilies = ["AGRUMATO", "CREMOSO", "FRESCO", "SALATO", "VANIGLIATO", "TALCATO", "MUSCHIATO", "LATTONICO", "MIELATO", "OZONICO", "FLOREALE BIANCO", "GOURMAND"];
+              const isLightColor = lightFamilies.includes(fam.name.toUpperCase());
+              
+              return (
+                <div key={fam.name} className="relative w-full h-[18px]">
+                  <div 
+                    className="h-full transition-all duration-1000 ease-out flex items-center px-2.5 rounded-[2px]" 
+                    style={{ 
+                      width: `${fam.percentage}%`, 
+                      backgroundColor: FAMILY_COLORS[fam.name as keyof typeof FAMILY_COLORS] || "#444" 
+                    }}
+                  >
+                    <span className={`text-[9px] font-semibold lowercase tracking-tight truncate ${
+                      isLightColor ? 'text-black' : 'text-white'
+                    }`}>
+                      {fam.name}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </div>
+
+    </div>
 </aside>
 
       {/* 3. OVERLAY DI SFONDO MOBILE (Chiude il menu toccando fuori) */}
@@ -940,62 +881,6 @@ if (isLoading) {
       {/* MAIN CONTENT */}
       {/* 4. Aggiunto padding-top per evitare sovrapposizioni con l'hamburger menu su mobile */}
       <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pt-20 md:pt-8">
-        
-        {/* AI COMMAND STATION */}
-        <div className="max-w-7xl mx-auto mb-10">
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-cyan-600/20 rounded-[2rem] blur-xl opacity-50 group-focus-within:opacity-100 transition duration-1000"></div>
-            
-            <div className="relative flex items-center bg-slate-900/90 border border-slate-800 rounded-[2rem] backdrop-blur-2xl shadow-2xl">
-              <div className="pl-6 text-blue-500 hidden sm:block">
-                <Activity size={20} className="animate-pulse" />
-              </div>
-              
-              <input 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter') {
-                    const success = await handleAIQuery(searchTerm);
-                    if (success) {
-                      setSearchTerm(''); 
-                      setActiveSection('editor'); 
-                    }
-                  }
-                }}
-                className="bg-transparent text-white py-4 px-4 sm:py-5 sm:px-5 text-xs sm:text-sm w-full outline-none font-medium placeholder:text-slate-600" 
-                placeholder="Chiedi a Gemini..." 
-              />
-              
-              <div className="pr-2 sm:pr-4">
-                <button 
-                  type="button"
-                  onClick={async () => {
-                    const success = await handleAIQuery(searchTerm);
-                    if (success) {
-                      setSearchTerm(''); 
-                      setActiveSection('editor'); 
-                    }
-                  }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-blue-500/20 whitespace-nowrap"
-                >
-                  Analizza
-                </button>
-              </div>
-            </div>
-            {isAiLoading && (
-              <div className="text-blue-500 text-xs sm:text-sm animate-pulse mt-2 ml-4">
-                ✦ Elaborazione...
-              </div>
-            )}
-            
-            <div className="absolute -bottom-6 left-6 flex items-center gap-2 hidden sm:flex">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Database Cloud Sincronizzato</span>
-            </div>
-          </div>
-        </div>
-
         <div className="max-w-7xl mx-auto">
           {/* 1. SEZIONE EDITOR */}
           {activeSection === 'editor' && (
@@ -1015,12 +900,24 @@ if (isLoading) {
          />
           )}
 
-          {/* 2. SEZIONE LIBRARY */}
+          {/* 2. SEZIONE LIBRERIA MATERIALI */}
           {activeSection === 'library' && (
-            <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+            <div className="space-y-6">
+              {/* BARRA DI RICERCA MANUALE */}
+              <div className="relative group max-w-md mx-auto mb-8">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
+                <input
+                  type="text"
+                  placeholder="Cerca tra le materie prime..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                />
+              </div>
+
               <MaterialLibrary 
                 materialsDB={materialsDB}
-                searchTerm={searchTerm}
+                searchTerm={searchTerm} // Passiamo la ricerca al componente
                 onSelectMaterial={(name) => {
                   setSelectedMaterialInfo(name);
                   setIsEditingMaterial(false);
@@ -1034,12 +931,26 @@ if (isLoading) {
 
           {/* 3. SEZIONE ARCHIVIO RAGGRUPPATO */}
           {activeSection === 'history' && (
-            <FormulaArchive 
-              history={history}
-              searchTerm={searchTerm}
-              deleteFromHistory={deleteFromHistory}
-              loadFromHistory={loadFromHistory}
-            />
+            <div className="space-y-6">
+              {/* BARRA DI RICERCA MANUALE */}
+              <div className="relative group max-w-md mx-auto mb-8">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
+                <input
+                  type="text"
+                  placeholder="Cerca una formula archiviata..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                />
+              </div>
+
+              <FormulaArchive 
+                history={history}
+                searchTerm={searchTerm} // Passiamo la ricerca al componente
+                deleteFromHistory={deleteFromHistory}
+                loadFromHistory={loadFromHistory}
+              />
+            </div>
           )}
         </div>
       </main> 
