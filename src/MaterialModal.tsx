@@ -70,19 +70,25 @@ const MaterialModal = ({
           
           <div className="p-4 sm:p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md sticky top-0 z-20">
             <div className="flex-1 min-w-0"> 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                {!isEditing ? (
-                  <h2 className="text-xl sm:text-3xl font-black text-white uppercase tracking-tighter truncate">{materialName}</h2>
-                ) : (
-                  <input
-                    type="text"
-                    className="text-xl sm:text-3xl font-black text-blue-400 uppercase tracking-tighter bg-white/5 border-b-2 border-blue-500 outline-none px-2 rounded-t-lg w-full max-w-xl transition-all"
-                    value={localName}
-                    onChange={(e) => setLocalName(e.target.value.toUpperCase())}
-                    onBlur={handleFinalRename}
-                    onKeyDown={(e) => e.key === 'Enter' && handleFinalRename()}
-                  />
-                )}
+  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+    {!isEditing ? (
+      <h2 
+        className="text-2xl sm:text-4xl font-medium text-white uppercase tracking-normal truncate"
+        style={{ fontFamily: 'Calibri, "Segoe UI", Candara, Segoe, Optima, Arial, sans-serif' }}
+      >
+        {materialName}
+      </h2>
+    ) : (
+      <input
+        type="text"
+        className="text-2xl sm:text-4xl font-medium text-blue-400 uppercase tracking-normal bg-white/5 border-b border-blue-500/50 outline-none px-2 rounded-t-lg w-full max-w-xl transition-all"
+        style={{ fontFamily: 'Calibri, "Segoe UI", Candara, Segoe, Optima, Arial, sans-serif' }}
+        value={localName}
+        onChange={(e) => setLocalName(e.target.value.toUpperCase())}
+        onBlur={handleFinalRename}
+        onKeyDown={(e) => e.key === 'Enter' && handleFinalRename()}
+      />
+    )}
                 <button 
                   onClick={() => setShowPersonalNotes(true)}
                   className="flex items-center justify-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl border border-amber-500/20 transition-all w-fit"
@@ -449,34 +455,79 @@ const MaterialModal = ({
                 </div>
 
                 <div className={`bg-slate-950/30 rounded-[1.5rem] sm:rounded-[2.5rem] border ${isEditing ? 'border-slate-700' : 'border-slate-800'} p-4 sm:p-8`}>
-                  <div className="flex justify-between items-center mb-6">
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Olfactive Families</h4>
-                    {isEditing && <button onClick={() => setShowFamilyGrid(true)} className="text-[9px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-bold tracking-widest uppercase">Aggiungi</button>}
-                  </div>
-                  <div className="space-y-6">
-                    {data.Families && Object.entries(data.Families).map(([fam, val]) => {
-                      const famColor = (FAMILY_COLORS as any)[fam] || '#475569';
-                      const dots = Math.round((val as number) / 10);
-                      return (
-                        <div key={fam} className="group">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-[9px] font-black text-white uppercase tracking-widest">{fam}</span>
-                            {isEditing && <button onClick={() => {
-                              const newFamilies = { ...data.Families };
-                              delete newFamilies[fam];
-                              onUpdate('Families', newFamilies);
-                            }} className="text-[8px] text-red-500/60 font-black uppercase">Rimuovi</button>}
-                          </div>
-                          <div className="flex justify-between sm:justify-start gap-1">
-                            {[...Array(10)].map((_, i) => (
-                              <button key={i} onClick={() => isEditing && updateFamilyValue(fam, (i + 1) * 10)} disabled={!isEditing} className={`w-6 h-6 sm:w-4 sm:h-4 rounded-full border transition-all ${i < dots ? 'border-transparent' : 'border-slate-800 bg-slate-900/30'}`} style={{ backgroundColor: i < dots ? famColor : 'transparent' }} />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+  <div className="flex justify-between items-center mb-6">
+    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Olfactive Families</h4>
+    {isEditing && (
+      <button 
+        onClick={() => setShowFamilyGrid(true)} 
+        className="text-[9px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-bold tracking-widest uppercase"
+      >
+        Aggiungi
+      </button>
+    )}
+  </div>
+  
+  <div className="space-y-5">
+    {data.Families && Object.entries(data.Families).map(([fam, val]) => {
+      const famColor = (FAMILY_COLORS as any)[fam] || '#475569';
+      const percentage = Math.min(100, val as number);
+      
+      return (
+        <div key={fam} className="group">
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[10px] font-bold text-slate-200 uppercase tracking-wide">{fam}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-mono text-slate-500">{percentage}%</span>
+              {isEditing && (
+                <button 
+                  onClick={() => {
+                    const newFamilies = { ...data.Families };
+                    delete newFamilies[fam];
+                    onUpdate('Families', newFamilies);
+                  }} 
+                  className="text-red-500/60 hover:text-red-500 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* BARRA INTERATTIVA AL POSTO DEI PALLINI */}
+          <div 
+            className={`relative h-2 w-full bg-slate-800/40 rounded-full overflow-hidden ${isEditing ? 'cursor-pointer' : 'cursor-default'}`}
+            onClick={(e) => {
+              if (!isEditing) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              // Calcola il valore a step di 10% in base a dove clicchi
+              const clickedPercentage = Math.round((x / rect.width) * 10) * 10;
+              updateFamilyValue(fam, Math.max(10, clickedPercentage));
+            }}
+          >
+            <div 
+              className="absolute inset-0 h-full rounded-full transition-all duration-300 ease-out"
+              style={{ 
+                width: `${percentage}%`,
+                backgroundColor: famColor,
+                boxShadow: `0 0 10px ${famColor}30`
+              }}
+            >
+              {/* Effetto luce sulla barra */}
+              <div className="absolute inset-0 w-full h-full bg-gradient-to-b from-white/10 to-transparent opacity-40"></div>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+
+    {(!data.Families || Object.keys(data.Families).length === 0) && (
+      <div className="py-6 text-center border-2 border-dashed border-slate-900/50 rounded-2xl">
+        <p className="text-[10px] text-slate-600 italic uppercase tracking-widest">Nessuna famiglia selezionata</p>
+      </div>
+    )}
+               </div>
+               </div>
               </div>
             </div>
           </div>
