@@ -491,19 +491,37 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
   const addAccordToFormula = (selectedAccord: Formula, targetWeight: number, explode: boolean) => {
     const originalTotalWeight = selectedAccord.ingredients.reduce((sum, ing) => sum + (Number(ing.weightG) || 0), 0);
     if (originalTotalWeight === 0) return;
+    
     const factor = targetWeight / originalTotalWeight;
+    
     if (explode) {
-      const explodedIngredients = selectedAccord.ingredients.map(ing => ({
-        ...ing,
-        id: Math.random().toString(36).substr(2, 9),
-        materialName: `${ing.materialName} (${selectedAccord.name})`,
-        weightG: Number((Number(ing.weightG) * factor).toFixed(3))
-      }));
+      const explodedIngredients = selectedAccord.ingredients.map(ing => {
+        // Recuperiamo i dati originali dal database usando il nome pulito
+        const materialData = materialsDB[ing.materialName];
+
+        return {
+          ...ing,
+          id: Math.random().toString(36).substr(2, 9),
+          // MANTENIAMO IL NOME PULITO (per permettere click e sidebar)
+          materialName: ing.materialName, 
+          // INIETTIAMO LA FAMIGLIA (per la piramide laterale)
+          Family: materialData?.Family || 'N/A',
+          Notes: materialData?.Notes || 'N/A',
+          weightG: Number((Number(ing.weightG) * factor).toFixed(3))
+        };
+      });
+      
       setFormula(prev => ({ ...prev, ingredients: [...prev.ingredients, ...explodedIngredients] }));
     } else {
       setFormula(prev => ({
         ...prev,
-        ingredients: [...prev.ingredients, { id: Math.random().toString(36).substr(2, 9), materialName: `ACCORDO: ${selectedAccord.name}`, weightG: targetWeight, dilution: "100%" }]
+        ingredients: [...prev.ingredients, { 
+          id: Math.random().toString(36).substr(2, 9), 
+          materialName: `ACCORDO: ${selectedAccord.name}`, 
+          weightG: targetWeight, 
+          dilution: "100%",
+          Family: 'Accord', // Per non far crashare la sidebar se non esploso
+        }]
       }));
     }
   };
