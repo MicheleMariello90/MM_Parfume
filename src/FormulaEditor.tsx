@@ -41,21 +41,26 @@ const FormulaEditor: React.FC<Props> = ({
 
   const ingredientsWithPercentages = useMemo(() => {
     return formula.ingredients.map(ing => {
-      const mat = materialsDB[ing.materialName];
-      const weight = Number(ing.weightG) || 0;
-      const isSolvent = mat?.Type === "Solvente";
-      const ratio = isSolvent ? 0 : (DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1);
-      const pureWeight = weight * ratio;
-      const absolutePercentage = totalGrossWeight > 0 ? (pureWeight / totalGrossWeight) * 100 : 0;
-
-      return { ...ing, pureWeight, absolutePercentage, isSolvent };
+      const mat = materialsDB[ing.materialName] || {};
+      const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
+      const pureWeight = (Number(ing.weightG) || 0) * ratio;
+      const isSolvent = mat.type === 'Solvente' || mat.Type === 'Solvente' || mat.IsSolvent === true;
+      return {
+        ...ing,
+        pureWeight,
+        isSolvent // Ora l'ingrediente "sa" se è un solvente
+      };
     });
-  }, [formula.ingredients, materialsDB, totalGrossWeight]);
-
+  }, [formula.ingredients, materialsDB]);
+  // Questo totale esclude l'alcol e serve per la piramide al 100%
+  const fragrantTotalWeight = useMemo(() => {
+    return ingredientsWithPercentages
+      .filter(ing => !ing.isSolvent)
+      .reduce((acc, ing) => acc + ing.pureWeight, 0);
+  }, [ingredientsWithPercentages]);
   const totalPureWeight = useMemo(() => {
     return ingredientsWithPercentages.reduce((acc, ing) => acc + ing.pureWeight, 0);
   }, [ingredientsWithPercentages]);
-
   const totalCost = useMemo(() => {
     return formula.ingredients.reduce((acc, ing) => {
       const mat = materialsDB[ing.materialName];
@@ -67,11 +72,15 @@ const FormulaEditor: React.FC<Props> = ({
   // --- LOGICA CALCOLO PERCENTUALI PER FASE (AGGIUNTA) ---
   const getPhaseTotal = (phaseIngredients: Ingredient[]) => {
     const sum = phaseIngredients.reduce((acc, ing) => {
+      // Se è un solvente, non deve contribuire alla percentuale della piramide
       const mat = materialsDB[ing.materialName];
-      if (mat?.Type === 'Solvente') return acc;
+      if (mat?.type === 'Solvente' || mat?.Type === 'Solvente') return acc;
+
       const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
       const pureWeight = (Number(ing.weightG) || 0) * ratio;
-      return acc + (totalGrossWeight > 0 ? (pureWeight / totalGrossWeight) * 100 : 0);
+      
+      // DIVIDIAMO PER IL TOTALE ODOROSO (fragrantTotalWeight)
+      return acc + (fragrantTotalWeight > 0 ? (pureWeight / fragrantTotalWeight) * 100 : 0);
     }, 0);
     return sum.toFixed(2);
   };
@@ -166,16 +175,18 @@ const FormulaEditor: React.FC<Props> = ({
 
     sortedIngredients.forEach(ing => {
       const mat = materialsDB[ing.materialName] || {};
-      const isSolvent = mat.Type === 'Solvente';
       
-      // Calcolo BP con fallback alle note testuali se BP numerico manca
-      const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 230 : 300);
+      // Controllo universale per il solvente (minuscolo e maiuscolo)
+      const isSolvent = mat.type === 'Solvente' || mat.Type === 'Solvente' || mat.IsSolvent === true;
+      
+      // Range BP ottimizzati (225 e 285)
+      const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 250 : 350);
 
       if (isSolvent) {
         solvents.push(ing);
-      } else if (bp < 200) {
+      } else if (bp < 225) {
         top.push(ing);
-      } else if (bp >= 200 && bp <= 260) {
+      } else if (bp >= 225 && bp <= 285) {
         heart.push(ing);
       } else {
         base.push(ing);
