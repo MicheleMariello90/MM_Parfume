@@ -2,8 +2,8 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 import FormulaEditor from './FormulaEditor';
 import { Formula, Ingredient } from './types';
-import { FAMILY_COLORS, DILUTION_MAP } from './constants';
-import { Book, Search, AlertTriangle, X, Plus, Menu, Droplets, FlaskConical, LogOut } from 'lucide-react';
+import { FAMILY_COLORS, DILUTION_MAP, IFRA_LIMITS } from './constants';
+import { Book, Search, Activity, AlertTriangle, X, Plus, Menu, Droplets, FlaskConical, LogOut } from 'lucide-react';
 import './index.css';
 
 import MaterialModal from './MaterialModal';
@@ -11,7 +11,7 @@ import FormulaArchive from './FormulaArchive';
 import MaterialLibrary from './MaterialLibrary';
 import { Auth } from './Auth';
 
-type Section = 'editor' | 'library' | 'history' | 'settings';
+type Section = 'editor' | 'library' | 'history' | 'ifra' | 'settings';
 
 // --- COMPONENTI DI SUPPORTO ORIGINALI ---
 const OlfactivePyramid = ({ notes }: { notes: string[] }) => {
@@ -491,37 +491,19 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
   const addAccordToFormula = (selectedAccord: Formula, targetWeight: number, explode: boolean) => {
     const originalTotalWeight = selectedAccord.ingredients.reduce((sum, ing) => sum + (Number(ing.weightG) || 0), 0);
     if (originalTotalWeight === 0) return;
-    
     const factor = targetWeight / originalTotalWeight;
-    
     if (explode) {
-      const explodedIngredients = selectedAccord.ingredients.map(ing => {
-        // Recuperiamo i dati originali dal database usando il nome pulito
-        const materialData = materialsDB[ing.materialName];
-
-        return {
-          ...ing,
-          id: Math.random().toString(36).substr(2, 9),
-          // MANTENIAMO IL NOME PULITO (per permettere click e sidebar)
-          materialName: ing.materialName, 
-          // INIETTIAMO LA FAMIGLIA (per la piramide laterale)
-          Family: materialData?.Family || 'N/A',
-          Notes: materialData?.Notes || 'N/A',
-          weightG: Number((Number(ing.weightG) * factor).toFixed(3))
-        };
-      });
-      
+      const explodedIngredients = selectedAccord.ingredients.map(ing => ({
+        ...ing,
+        id: Math.random().toString(36).substr(2, 9),
+        materialName: `${ing.materialName} (${selectedAccord.name})`,
+        weightG: Number((Number(ing.weightG) * factor).toFixed(3))
+      }));
       setFormula(prev => ({ ...prev, ingredients: [...prev.ingredients, ...explodedIngredients] }));
     } else {
       setFormula(prev => ({
         ...prev,
-        ingredients: [...prev.ingredients, { 
-          id: Math.random().toString(36).substr(2, 9), 
-          materialName: `ACCORDO: ${selectedAccord.name}`, 
-          weightG: targetWeight, 
-          dilution: "100%",
-          Family: 'Accord', // Per non far crashare la sidebar se non esploso
-        }]
+        ingredients: [...prev.ingredients, { id: Math.random().toString(36).substr(2, 9), materialName: `ACCORDO: ${selectedAccord.name}`, weightG: targetWeight, dilution: "100%" }]
       }));
     }
   };
@@ -806,7 +788,7 @@ if (isLoading) {
       <img 
         src="/logo.png" 
         className="w-32 h-32 object-contain cursor-pointer hover:scale-105 transition-transform" 
-        onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); setSearchTerm(''); }}
+        onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
         alt="Logo Aura Lab"
       />
     </div>
@@ -816,7 +798,7 @@ if (isLoading) {
       {/* NAVIGAZIONE */}
       <nav className="w-full px-4 space-y-1">
         <button 
-          onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); setSearchTerm(''); }}
+          onClick={() => { setActiveSection('editor'); setIsMenuOpen(false); }}
           className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
             activeSection === 'editor' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -826,7 +808,7 @@ if (isLoading) {
         </button>
 
         <button 
-          onClick={() => { setActiveSection('library'); setIsMenuOpen(false); setSearchTerm(''); }}
+          onClick={() => { setActiveSection('library'); setIsMenuOpen(false); }}
           className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
             activeSection === 'library' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -836,7 +818,7 @@ if (isLoading) {
         </button>
 
         <button 
-          onClick={() => { setActiveSection('history'); setIsMenuOpen(false); setSearchTerm(''); }}
+          onClick={() => { setActiveSection('history'); setIsMenuOpen(false); }}
           className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-xl transition-all ${
             activeSection === 'history' ? 'bg-blue-900/20 text-white border border-blue-500/10' : 'text-slate-500 hover:text-slate-300'
           }`}
@@ -844,7 +826,18 @@ if (isLoading) {
           <Search size={16} className={activeSection === 'history' ? 'text-blue-400' : 'text-slate-500'} />
           <span className="text-[10px] font-bold tracking-[0.15em] uppercase">Archivio Formule</span>
         </button>
-
+        {/* TASTO LISTA IFRA */}
+<button
+  onClick={() => setActiveSection('ifra')}
+  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+    activeSection === 'ifra' 
+      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20' 
+      : 'text-slate-400 hover:bg-slate-800'
+  }`}
+>
+  <AlertTriangle size={20} /> 
+  <span className="font-bold text-[10px] uppercase tracking-widest text-left">Lista IFRA</span>
+</button>
         {/* TASTO LOGOUT */}
         <button 
           onClick={() => supabase.auth.signOut()}
@@ -949,30 +942,57 @@ if (isLoading) {
 
           {/* 3. SEZIONE ARCHIVIO RAGGRUPPATO */}
           {activeSection === 'history' && (
-            <div className="space-y-6">
-              {/* BARRA DI RICERCA MANUALE */}
-              <div className="relative group max-w-md mx-auto mb-8">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors" size={18} />
-                <input
-                  type="text"
-                  placeholder="Cerca una formula archiviata..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-900/50 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
-                />
-              </div>
+            <FormulaArchive 
+              history={history}
+              searchTerm={searchTerm}
+              deleteFromHistory={deleteFromHistory}
+              loadFromHistory={loadFromHistory}
+            />
+          )}
+          {activeSection === 'ifra' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+              <div className="bg-slate-900/50 border border-slate-800 rounded-[2.5rem] p-8">
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="p-3 bg-blue-500/20 rounded-2xl text-blue-500">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white uppercase tracking-tighter">Database Completo IFRA - 51° Emendamento (Categoria 4 - Profumi Alcolici)</h2>
+                    <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">
+                      Clicca sul nome per copiarlo negli appunti
+                    </p>
+                  </div>
+                </div>
 
-              <FormulaArchive 
-                history={history}
-                searchTerm={searchTerm} // Passiamo la ricerca al componente
-                deleteFromHistory={deleteFromHistory}
-                loadFromHistory={loadFromHistory}
-              />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {Object.entries(IFRA_LIMITS).sort().map(([name, limit]) => (
+                    <div 
+                      key={name}
+                      onClick={(e) => {
+                        navigator.clipboard.writeText(name);
+                        const target = e.currentTarget;
+                        target.style.borderColor = '#3b82f6';
+                        setTimeout(() => target.style.borderColor = '', 500);
+                      }}
+                      className="group p-4 bg-slate-950/50 border border-slate-800 rounded-2xl hover:border-blue-500/50 transition-all cursor-pointer active:scale-95"
+                    >
+                      <div className="flex flex-col gap-2">
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider group-hover:text-blue-400 transition-colors">
+                          {name}
+                        </span>
+                        <div className="flex justify-between items-center border-t border-slate-800 pt-2 mt-1">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase">Limite Cat. 4</span>
+                          <span className="text-[10px] font-mono font-bold text-blue-500">{limit}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
       </main> 
-
       {/* <---BLOCCO DEL MATERIALMODAL ---> */}
       {selectedMaterialInfo && materialsDB[selectedMaterialInfo] && (
         <MaterialModal 
