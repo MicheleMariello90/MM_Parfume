@@ -184,9 +184,9 @@ const FormulaEditor: React.FC<Props> = ({
 
       if (isSolvent) {
         solvents.push(ing);
-      } else if (bp < 225) {
+      } else if (bp < 200) {
         top.push(ing);
-      } else if (bp >= 225 && bp <= 285) {
+      } else if (bp >= 200 && bp <= 260) {
         heart.push(ing);
       } else {
         base.push(ing);
@@ -536,7 +536,8 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
     const pureWeight = (Number(ing.weightG) || 0) * ratio;
     
     // 1. BP e IMPACT
-    const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 260 : 350);
+    // Nel sotto-componente MaterialImpactPyramid
+    const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 245 : 350);
     const impact = parseFloat(mat.impact || mat.Impact || 10);
     
     // 2. POTENZA LINEARE
@@ -546,9 +547,9 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
     let pTesta = 0; let pCuore = 0; let pFondo = 0;
 
     // 3. DISTRIBUZIONE DINAMICA BP
-    if (bp < 200) {
+    if (bp < 190) {
       pTesta = totalPower; pCuore = totalPower * 0.05; pFondo = 0;
-    } else if (bp >= 200 && bp <= 260) {
+    } else if (bp >= 190 && bp <= 260) {
       pTesta = totalPower * 0.4; pCuore = totalPower; pFondo = totalPower * 0.6;
     } else {
       pTesta = totalPower * 0.1; pCuore = totalPower * 0.4; pFondo = totalPower;
