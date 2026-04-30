@@ -180,13 +180,13 @@ const FormulaEditor: React.FC<Props> = ({
       const isSolvent = mat.type === 'Solvente' || mat.Type === 'Solvente' || mat.IsSolvent === true;
       
       // Range BP ottimizzati (225 e 285)
-      const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 250 : 350);
+      const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 200 : 290);
 
       if (isSolvent) {
         solvents.push(ing);
       } else if (bp < 200) {
         top.push(ing);
-      } else if (bp >= 200 && bp <= 260) {
+      } else if (bp >= 200 && bp <= 290) {
         heart.push(ing);
       } else {
         base.push(ing);
