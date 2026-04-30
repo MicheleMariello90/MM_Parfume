@@ -537,7 +537,7 @@ const MaterialImpactPyramid = ({ formula, materialsDB }: { formula: Formula, mat
     
     // 1. BP e IMPACT
     // Nel sotto-componente MaterialImpactPyramid
-    const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 245 : 350);
+    const bp = Number(mat.BP) || (mat.Notes?.includes('Testa') ? 180 : mat.Notes?.includes('Cuore') ? 200 : 350);
     const impact = parseFloat(mat.impact || mat.Impact || 10);
     
     // 2. POTENZA LINEARE
