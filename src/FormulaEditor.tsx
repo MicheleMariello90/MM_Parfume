@@ -199,7 +199,7 @@ const FormulaEditor: React.FC<Props> = ({
   // --- 5. FUNZIONE DI RENDER DELLA SINGOLA RIGA (COMPLETA DI TUTTO) ---
   const renderRow = (ing: Ingredient) => {
     const mat = materialsDB[ing.materialName];
-    const isSolvent = mat?.Type === 'Solvente';
+    const isSolvent = mat?.type === 'Solvente';
     const ratio = DILUTION_MAP[ing.dilution as keyof typeof DILUTION_MAP] || 1;
     const weightG = Number(ing.weightG) || 0;
     const pureWeight = weightG * ratio;
@@ -510,7 +510,7 @@ const FormulaEditor: React.FC<Props> = ({
             <div>
               <p className="text-[8px] text-slate-500 uppercase font-black mb-1 text-blue-400">Materie Prime (%)</p>
               <p className="text-lg font-black text-blue-400 font-mono">
-                {totalGrossWeight > 0 ? ((totalPureWeight / totalGrossWeight) * 100).toFixed(2) : '0.00'}%
+                {totalGrossWeight > 0 ? ((fragrantTotalWeight / totalGrossWeight) * 100).toFixed(2) : '0.00'}%
               </p>
             </div>
             <div>
