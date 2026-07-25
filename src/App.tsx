@@ -496,7 +496,8 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
       const explodedIngredients = selectedAccord.ingredients.map(ing => ({
         ...ing,
         id: Math.random().toString(36).substr(2, 9),
-        materialName: `${ing.materialName} (${selectedAccord.name})`,
+        // ECCO LA MODIFICA: Nessuna parentesi, solo il nome originale della materia prima
+        materialName: ing.materialName,
         weightG: Number((Number(ing.weightG) * factor).toFixed(3))
       }));
       setFormula(prev => ({ ...prev, ingredients: [...prev.ingredients, ...explodedIngredients] }));
