@@ -487,33 +487,65 @@ const handleDeleteMaterial = useCallback(async (id: any, e: React.MouseEvent) =>
   };
 
   // --- 5. LOGICA ACCORDI ---
-  
-  const addAccordToFormula = (selectedAccord: Formula, targetWeight: number, explode: boolean) => {
-    const originalTotalWeight = selectedAccord.ingredients.reduce((sum, ing) => sum + (Number(ing.weightG) || 0), 0);
-    if (originalTotalWeight === 0) return;
-    const factor = targetWeight / originalTotalWeight;
-    if (explode) {
-      const explodedIngredients = selectedAccord.ingredients.map(ing => ({
-        ...ing,
-        id: Math.random().toString(36).substr(2, 9),
-        // ECCO LA MODIFICA: Nessuna parentesi, solo il nome originale della materia prima
-        materialName: ing.materialName,
-        weightG: Number((Number(ing.weightG) * factor).toFixed(3))
-      }));
-      setFormula(prev => ({ ...prev, ingredients: [...prev.ingredients, ...explodedIngredients] }));
-    } else {
-      setFormula(prev => ({
-        ...prev,
-        ingredients: [...prev.ingredients, { id: Math.random().toString(36).substr(2, 9), materialName: `ACCORDO: ${selectedAccord.name}`, weightG: targetWeight, dilution: "100%" }]
-      }));
+
+  const addAccordToFormula = (selectedAccord: Formula, targetWeight: number) => {
+    const parseWeight = (val: unknown) => {
+      if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
+      const cleaned = String(val ?? '').trim().replace(',', '.');
+      const num = parseFloat(cleaned);
+      return Number.isFinite(num) ? num : 0;
+    };
+
+    const sourceIngredients = Array.isArray(selectedAccord?.ingredients)
+      ? selectedAccord.ingredients
+      : [];
+
+    const originalTotalWeight = sourceIngredients.reduce(
+      (sum, ing) => sum + parseWeight(ing.weightG),
+      0
+    );
+
+    if (originalTotalWeight <= 0) {
+      window.alert(`L'accordo "${selectedAccord?.name || 'selezionato'}" ha peso totale 0 o non valido.`);
+      return;
     }
+
+    const factor = targetWeight / originalTotalWeight;
+    const chordInstanceId = `chord_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const explodedIngredients: Ingredient[] = sourceIngredients.map(ing => {
+      const rawIngWeight = parseWeight(ing.weightG);
+      const chordRatio = rawIngWeight / originalTotalWeight;
+      const scaledWeight = Number((rawIngWeight * factor).toFixed(3));
+
+      return {
+        ...ing,
+        id: Math.random().toString(36).substring(2, 9) + Date.now(),
+        materialName: ing.materialName,
+        weightG: scaledWeight,
+        explodedChordId: chordInstanceId,
+        explodedChordName: selectedAccord.name,
+        chordRatio
+      };
+    });
+
+    setFormula(prev => ({
+      ...prev,
+      ingredients: [...prev.ingredients, ...explodedIngredients]
+    }));
   };
 
   const handleSelectAccord = (accord: Formula) => {
-    const weightStr = window.prompt(`Quanto peso di "${accord.name}" vuoi aggiungere? (g)`, "1.000");
-    if (!weightStr || isNaN(parseFloat(weightStr))) return;
-    const explode = window.confirm(`Come vuoi aggiungere "${accord.name}"?\n\nOK: Esplodi nelle singole materie prime\nANNULLA: Mantieni come voce unica`);
-    addAccordToFormula(accord, parseFloat(weightStr), explode);
+    const weightStr = window.prompt(
+      `Quanto peso di "${accord.name}" vuoi aggiungere esploso in formula? (g)`,
+      "1.000"
+    );
+    if (!weightStr) return;
+
+    const parsedWeight = parseFloat(weightStr.replace(',', '.').trim());
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) return;
+
+    addAccordToFormula(accord, parsedWeight);
     setIsSelecting(false);
   };
 

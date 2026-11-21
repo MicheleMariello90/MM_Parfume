@@ -137,6 +137,96 @@ const FormulaEditor: React.FC<Props> = ({
     onUpdate({ ...formula, ingredients: formula.ingredients.filter(ing => ing.id !== id) });
   };
 
+  // --- 3B. ACCORDI ESPLOSI: RAGGRUPPAMENTO E RICALCOLO PROPORZIONALE ---
+  const [chordDraftWeights, setChordDraftWeights] = useState<Record<string, string>>({});
+
+  interface ExplodedChordGroup {
+    chordId: string;
+    chordName: string;
+    currentTotalG: number;
+    itemsCount: number;
+  }
+
+  const explodedChords = useMemo<ExplodedChordGroup[]>(() => {
+    const groupsMap = new Map<string, ExplodedChordGroup>();
+
+    formula.ingredients.forEach(ing => {
+      if (!ing.explodedChordId) return;
+      const w = Number(String(ing.weightG ?? 0).replace(',', '.')) || 0;
+      const existing = groupsMap.get(ing.explodedChordId);
+
+      if (existing) {
+        existing.currentTotalG += w;
+        existing.itemsCount += 1;
+      } else {
+        groupsMap.set(ing.explodedChordId, {
+          chordId: ing.explodedChordId,
+          chordName: ing.explodedChordName || 'Accordo esploso',
+          currentTotalG: w,
+          itemsCount: 1
+        });
+      }
+    });
+
+    return Array.from(groupsMap.values());
+  }, [formula.ingredients]);
+
+  const handleExplodedChordWeightChange = (chordId: string, rawInput: string) => {
+    const sanitized = rawInput.replace(',', '.');
+    if (!/^\d*\.?\d*$/.test(sanitized)) return;
+
+    setChordDraftWeights(prev => ({ ...prev, [chordId]: sanitized }));
+
+    if (sanitized === '' || sanitized === '.') return;
+    const newChordTotal = parseFloat(sanitized);
+    if (Number.isNaN(newChordTotal)) return;
+
+    const groupIngredients = formula.ingredients.filter(ing => ing.explodedChordId === chordId);
+    if (groupIngredients.length === 0) return;
+
+    const currentGroupTotal = groupIngredients.reduce(
+      (sum, ing) => sum + (Number(String(ing.weightG ?? 0).replace(',', '.')) || 0),
+      0
+    );
+
+    const shares = groupIngredients.map(ing => {
+      if (typeof ing.chordRatio === 'number' && !Number.isNaN(ing.chordRatio) && ing.chordRatio > 0) {
+        return ing.chordRatio;
+      }
+      const w = Number(String(ing.weightG ?? 0).replace(',', '.')) || 0;
+      return currentGroupTotal > 0 ? w / currentGroupTotal : 1 / groupIngredients.length;
+    });
+
+    const shareSum = shares.reduce((a, b) => a + b, 0) || 1;
+
+    let idx = 0;
+    const updatedIngredients = formula.ingredients.map(ing => {
+      if (ing.explodedChordId !== chordId) return ing;
+      const normalizedShare = shares[idx] / shareSum;
+      idx += 1;
+      return {
+        ...ing,
+        weightG: Number((newChordTotal * normalizedShare).toFixed(3))
+      };
+    });
+
+    onUpdate({ ...formula, ingredients: updatedIngredients });
+  };
+
+  const handleRemoveExplodedChord = (chordId: string) => {
+    const remainingIngredients = formula.ingredients.filter(
+      ing => ing.explodedChordId !== chordId
+    );
+
+    setChordDraftWeights(prev => {
+      const copy = { ...prev };
+      delete copy[chordId];
+      return copy;
+    });
+
+    onUpdate({ ...formula, ingredients: remainingIngredients });
+  };
+
   const sortedIngredients = useMemo(() => {
     const sorted = [...formula.ingredients];
     sorted.sort((a, b) => {
@@ -520,7 +610,93 @@ const FormulaEditor: React.FC<Props> = ({
           </div>
         </div>
       </div>
-      
+      {/* TABELLA ACCORDI ESPLOSI — MODIFICA PESO IN TEMPO REALE */}
+      {explodedChords.length > 0 && (
+        <div className="mx-6 md:mx-8 mt-6 bg-amber-950/10 rounded-2xl border border-amber-500/30 overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-amber-500/20 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-amber-400">
+                Accordi Esplosi — Proporzione in Tempo Reale
+              </h3>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Modificando i grammi totali dell&apos;accordo si aggiornano in proporzione tutte le materie prime collegate
+              </p>
+            </div>
+            <span className="text-[10px] font-mono text-amber-300/80 uppercase">
+              {explodedChords.length} {explodedChords.length === 1 ? 'accordo' : 'accordi'}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800/70 text-[10px] uppercase tracking-widest text-slate-500 font-bold">
+                  <th className="py-3 px-4 md:px-6 text-left">Accordo</th>
+                  <th className="py-3 px-4 text-center">Componenti</th>
+                  <th className="py-3 px-4 md:px-6 text-right">Peso Accordo (g)</th>
+                  <th className="py-3 px-4 md:px-6 text-right">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {explodedChords.map(chord => {
+                  const draftValue = chordDraftWeights[chord.chordId];
+                  const displayValue =
+                    draftValue !== undefined
+                      ? draftValue
+                      : Number(chord.currentTotalG.toFixed(3)).toString();
+
+                  return (
+                    <tr
+                      key={chord.chordId}
+                      className="border-b border-slate-900/60 last:border-b-0 hover:bg-amber-500/[0.04] transition-colors"
+                    >
+                      <td className="py-3 px-4 md:px-6 font-bold text-xs md:text-sm text-amber-300 uppercase tracking-wide">
+                        {chord.chordName}
+                      </td>
+                      <td className="py-3 px-4 text-center font-mono text-xs text-slate-400">
+                        {chord.itemsCount} materie prime
+                      </td>
+                      <td className="py-3 px-4 md:px-6 text-right">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={displayValue}
+                          onFocus={() =>
+                            setChordDraftWeights(prev => ({
+                              ...prev,
+                              [chord.chordId]: Number(chord.currentTotalG.toFixed(3)).toString()
+                            }))
+                          }
+                          onChange={e => handleExplodedChordWeightChange(chord.chordId, e.target.value)}
+                          onBlur={() =>
+                            setChordDraftWeights(prev => {
+                              const copy = { ...prev };
+                              delete copy[chord.chordId];
+                              return copy;
+                            })
+                          }
+                          className="bg-black/70 border border-amber-500/30 focus:border-amber-400 rounded-xl py-1.5 px-3 text-white font-mono text-xs w-28 text-right outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+                        />
+                      </td>
+                      <td className="py-3 px-4 md:px-6 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExplodedChord(chord.chordId)}
+                          title={`Rimuovi accordo ${chord.chordName}`}
+                          aria-label={`Rimuovi accordo ${chord.chordName}`}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-black/70 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10 transition-all font-mono text-xs font-bold"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {/* Visualizzazione Piramide Impatto */}
       <MaterialImpactPyramid formula={formula} materialsDB={materialsDB} />
     </div>
